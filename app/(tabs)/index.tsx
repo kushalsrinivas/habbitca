@@ -1,75 +1,303 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useFocusEffect } from "@react-navigation/native";
+import { format } from "date-fns";
+import React, { useCallback, useState } from "react";
+import {
+  Alert,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ClayButton } from "@/components/ui/ClayButton";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { HabitCard } from "@/components/ui/HabitCard";
+import { XPProgressBar } from "@/components/ui/XPProgressBar";
+import { Colors } from "@/constants/Colors";
+import { type Habit, type UserStats, useDatabase } from "@/hooks/useDatabase";
 
-export default function HomeScreen() {
+export default function HabitsScreen() {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [habitCompletions, setHabitCompletions] = useState<
+    Record<number, boolean>
+  >({});
+  const [habitStreaks, setHabitStreaks] = useState<Record<number, number>>({});
+  const [refreshing, setRefreshing] = useState(false);
+
+  const db = useDatabase();
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const loadData = useCallback(async () => {
+    try {
+      await db.initializeDatabase();
+
+      const [habitsData, statsData] = await Promise.all([
+        db.getHabits(),
+        db.getUserStats(),
+      ]);
+
+      setHabits(habitsData);
+      setUserStats(statsData);
+
+      // Load completion status and streaks for each habit
+      const completions: Record<number, boolean> = {};
+      const streaks: Record<number, number> = {};
+
+      for (const habit of habitsData) {
+        const [isCompleted, streak] = await Promise.all([
+          db.getHabitCompletion(habit.id, today),
+          db.getHabitStreak(habit.id, today),
+        ]);
+        completions[habit.id] = isCompleted;
+        streaks[habit.id] = streak;
+      }
+
+      setHabitCompletions(completions);
+      setHabitStreaks(streaks);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      Alert.alert("Error", "Failed to load habits data");
+    }
+  }, [db, today]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const handleToggleHabit = async (habitId: number) => {
+    try {
+      const isCurrentlyCompleted = habitCompletions[habitId];
+
+      if (isCurrentlyCompleted) {
+        await db.uncompleteHabit(habitId, today);
+      } else {
+        await db.completeHabit(habitId, today);
+      }
+
+      // Reload data to get updated stats
+      await loadData();
+    } catch (error) {
+      console.error("Error toggling habit:", error);
+      Alert.alert("Error", "Failed to update habit");
+    }
+  };
+
+  const handleAddHabit = () => {
+    Alert.alert(
+      "Add Habit",
+      "Habit creation feature coming soon! This MVP focuses on the core tracking and gamification experience.",
+      [{ text: "OK", style: "default" }]
+    );
+  };
+
+  const getXPProgress = () => {
+    if (!userStats) return { current: 0, needed: 100, percentage: 0 };
+    return db.getXPProgress(userStats.xp, userStats.level);
+  };
+
+  const xpProgress = getXPProgress();
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Habit Tracker</Text>
+          <Text style={styles.subtitle}>
+            Build better habits, one day at a time
+          </Text>
+        </View>
+
+        {/* User Stats Dashboard */}
+        <GlassCard style={styles.statsCard}>
+          <View style={styles.statsHeader}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>
+                👑 Level {userStats?.level || 1}
+              </Text>
+            </View>
+            <Text style={styles.xpText}>{userStats?.xp || 0} XP</Text>
+          </View>
+
+          <XPProgressBar
+            currentXP={xpProgress.current}
+            neededXP={xpProgress.needed}
+            level={userStats?.level || 1}
+            percentage={xpProgress.percentage}
+          />
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{habits.length}</Text>
+              <Text style={styles.statLabel}>Active Habits</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {Object.values(habitCompletions).filter(Boolean).length}
+              </Text>
+              <Text style={styles.statLabel}>Completed Today</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {Math.max(...Object.values(habitStreaks), 0)}
+              </Text>
+              <Text style={styles.statLabel}>Best Streak</Text>
+            </View>
+          </View>
+        </GlassCard>
+
+        {/* Add Habit Button */}
+        <View style={styles.addButtonContainer}>
+          <ClayButton
+            title="+ Add New Habit"
+            onPress={handleAddHabit}
+            variant="primary"
+            size="large"
+          />
+        </View>
+
+        {/* Habits List */}
+        <View style={styles.habitsSection}>
+          <Text style={styles.sectionTitle}>Today's Habits</Text>
+
+          {habits.length === 0 ? (
+            <GlassCard style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No habits yet!</Text>
+              <Text style={styles.emptySubtext}>
+                This MVP showcases the core tracking and gamification features.
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Habit creation will be added in the next version.
+              </Text>
+            </GlassCard>
+          ) : (
+            habits.map((habit) => (
+              <HabitCard
+                key={habit.id}
+                habit={habit}
+                isCompleted={habitCompletions[habit.id] || false}
+                streak={habitStreaks[habit.id] || 0}
+                onToggleComplete={() => handleToggleHabit(habit.id)}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.dark.background1,
   },
-  stepContainer: {
-    gap: 8,
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    padding: 20,
+    paddingTop: 10,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: Colors.dark.textSecondary,
+  },
+  statsCard: {
+    margin: 16,
+    padding: 20,
+  },
+  statsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  levelBadge: {
+    backgroundColor: Colors.dark.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  levelText: {
+    color: Colors.dark.textPrimary,
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  xpText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.xp.text,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 16,
+  },
+  statItem: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    marginTop: 4,
+  },
+  addButtonContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  habitsSection: {
+    paddingBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  emptyCard: {
+    margin: 16,
+    padding: 32,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
+    marginBottom: 4,
   },
 });
