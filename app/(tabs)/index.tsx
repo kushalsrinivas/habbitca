@@ -11,12 +11,19 @@ import {
   View,
 } from "react-native";
 
+import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HabitCard } from "@/components/ui/HabitCard";
+import { HabitCreationBottomSheet } from "@/components/ui/HabitCreationBottomSheet";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
-import { type Habit, type UserStats, useDatabase } from "@/hooks/useDatabase";
+import {
+  type Achievement,
+  type Habit,
+  type UserStats,
+  useDatabase,
+} from "@/hooks/useDatabase";
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -26,6 +33,10 @@ export default function HabitsScreen() {
   >({});
   const [habitStreaks, setHabitStreaks] = useState<Record<number, number>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [unlockedAchievement, setUnlockedAchievement] =
+    useState<Achievement | null>(null);
+  const [showAchievementModal, setShowAchievementModal] = useState(false);
+  const [isAddHabitVisible, setIsAddHabitVisible] = useState(false);
 
   const db = useDatabase();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -33,6 +44,9 @@ export default function HabitsScreen() {
   const loadData = useCallback(async () => {
     try {
       await db.initializeDatabase();
+
+      // Initialize sample habits for testing (only if no habits exist)
+      await db.initializeSampleHabits();
 
       const [habitsData, statsData] = await Promise.all([
         db.getHabits(),
@@ -83,6 +97,21 @@ export default function HabitsScreen() {
         await db.uncompleteHabit(habitId, today);
       } else {
         await db.completeHabit(habitId, today);
+
+        // Check for newly unlocked achievements
+        const newAchievements = await db.checkAndUnlockAchievements();
+        if (newAchievements.length > 0) {
+          // Show the first unlocked achievement
+          const achievements = await db.getAllAchievements();
+          const unlockedAchievement = achievements.find(
+            (a) => newAchievements.includes(a.id) && a.is_unlocked
+          );
+
+          if (unlockedAchievement) {
+            setUnlockedAchievement(unlockedAchievement);
+            setShowAchievementModal(true);
+          }
+        }
       }
 
       // Reload data to get updated stats
@@ -94,11 +123,47 @@ export default function HabitsScreen() {
   };
 
   const handleAddHabit = () => {
-    Alert.alert(
-      "Add Habit",
-      "Habit creation feature coming soon! This MVP focuses on the core tracking and gamification experience.",
-      [{ text: "OK", style: "default" }]
-    );
+    setIsAddHabitVisible(true);
+  };
+
+  const handleCreateHabit = async (habitData: {
+    title: string;
+    description: string;
+    emoji: string;
+    category: string;
+    time: string;
+  }) => {
+    try {
+      await db.addHabit({
+        title: habitData.title,
+        description: habitData.description,
+        emoji: habitData.emoji,
+        category: habitData.category,
+        frequency: "daily",
+        time: habitData.time,
+      });
+
+      // Reload data to show the new habit
+      await loadData();
+
+      // Close the bottom sheet
+      setIsAddHabitVisible(false);
+
+      // Show success message
+      Alert.alert(
+        "Success! 🎉",
+        `Your habit '${habitData.title}' has been created. Start building your streak!`,
+        [{ text: "OK", style: "default" }]
+      );
+    } catch (error) {
+      console.error("Error creating habit:", error);
+      Alert.alert("Error", "Failed to create habit. Please try again.");
+    }
+  };
+
+  const handleCloseAchievementModal = () => {
+    setShowAchievementModal(false);
+    setUnlockedAchievement(null);
   };
 
   const getXPProgress = () => {
@@ -178,12 +243,9 @@ export default function HabitsScreen() {
 
           {habits.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No habits yet!</Text>
+              <Text style={styles.emptyText}>Loading your habits...</Text>
               <Text style={styles.emptySubtext}>
-                This MVP showcases the core tracking and gamification features.
-              </Text>
-              <Text style={styles.emptySubtext}>
-                Habit creation will be added in the next version.
+                We're setting up some sample habits to get you started!
               </Text>
             </GlassCard>
           ) : (
@@ -199,6 +261,20 @@ export default function HabitsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Achievement Unlock Modal */}
+      <AchievementUnlockModal
+        visible={showAchievementModal}
+        achievement={unlockedAchievement}
+        onClose={handleCloseAchievementModal}
+      />
+
+      {/* Habit Creation Bottom Sheet */}
+      <HabitCreationBottomSheet
+        visible={isAddHabitVisible}
+        onClose={() => setIsAddHabitVisible(false)}
+        onCreateHabit={handleCreateHabit}
+      />
     </SafeAreaView>
   );
 }

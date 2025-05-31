@@ -4,6 +4,8 @@ export interface Habit {
   id: number;
   title: string;
   description: string;
+  emoji: string;
+  category: string;
   frequency: 'daily';
   time: string; // HH:MM format
   created_at: string;
@@ -27,6 +29,29 @@ export interface UserStats {
   achievements: string; // JSON string for future use
 }
 
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  type: 'bronze' | 'silver' | 'gold' | 'platinum';
+  requirement: {
+    type: 'streak' | 'habits_completed' | 'level' | 'consistency' | 'total_xp';
+    value: number;
+    timeframe?: 'day' | 'week' | 'month' | 'all_time';
+  };
+  xp_reward: number;
+  unlocked_at?: string;
+  is_unlocked: boolean;
+}
+
+export interface UserAchievement {
+  id: number;
+  achievement_id: string;
+  unlocked_at: string;
+  xp_earned: number;
+}
+
 export const useDatabase = () => {
   const db = useSQLiteContext();
 
@@ -38,12 +63,23 @@ export const useDatabase = () => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
           description TEXT,
+          emoji TEXT DEFAULT '⭐',
+          category TEXT DEFAULT 'Other / Custom',
           frequency TEXT DEFAULT 'daily',
           time TEXT NOT NULL,
           created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           is_active BOOLEAN DEFAULT 1
         );
       `);
+
+      // Add emoji and category columns if they don't exist (for existing databases)
+      await db.execAsync(`
+        ALTER TABLE habits ADD COLUMN emoji TEXT DEFAULT '⭐';
+      `).catch(() => {}); // Ignore error if column already exists
+      
+      await db.execAsync(`
+        ALTER TABLE habits ADD COLUMN category TEXT DEFAULT 'Other / Custom';
+      `).catch(() => {}); // Ignore error if column already exists
 
       // Create habit_logs table
       await db.execAsync(`
@@ -70,11 +106,42 @@ export const useDatabase = () => {
         );
       `);
 
+      // Create achievements table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS achievements (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          type TEXT NOT NULL,
+          requirement_type TEXT NOT NULL,
+          requirement_value INTEGER NOT NULL,
+          requirement_timeframe TEXT,
+          xp_reward INTEGER NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Create user_achievements table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS user_achievements (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          achievement_id TEXT NOT NULL,
+          unlocked_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          xp_earned INTEGER NOT NULL,
+          FOREIGN KEY (achievement_id) REFERENCES achievements (id),
+          UNIQUE(achievement_id)
+        );
+      `);
+
       // Initialize user stats if not exists
       await db.execAsync(`
         INSERT OR IGNORE INTO user_stats (id, level, xp, total_streaks, longest_streak, achievements)
         VALUES (1, 1, 0, 0, 0, '{}');
       `);
+
+      // Initialize default achievements
+      await initializeDefaultAchievements();
 
       console.log('Database initialized successfully');
     } catch (error) {
@@ -86,8 +153,8 @@ export const useDatabase = () => {
   const addHabit = async (habit: Omit<Habit, 'id' | 'created_at' | 'is_active'>) => {
     try {
       const result = await db.runAsync(
-        'INSERT INTO habits (title, description, frequency, time) VALUES (?, ?, ?, ?)',
-        [habit.title, habit.description, habit.frequency, habit.time]
+        'INSERT INTO habits (title, description, emoji, category, frequency, time) VALUES (?, ?, ?, ?, ?, ?)',
+        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time]
       );
       return result.lastInsertRowId;
     } catch (error) {
@@ -132,6 +199,9 @@ export const useDatabase = () => {
 
       // Update user stats
       await updateUserXP(xpEarned);
+      
+      // Check for new achievements
+      await checkAndUnlockAchievements();
       
       return xpEarned;
     } catch (error) {
@@ -271,6 +341,352 @@ export const useDatabase = () => {
     };
   };
 
+  // Achievement operations
+  const initializeDefaultAchievements = async () => {
+    try {
+      const defaultAchievements = [
+        {
+          id: 'first_habit',
+          title: 'First Steps',
+          description: 'Complete your first habit',
+          icon: '🎯',
+          type: 'bronze',
+          requirement_type: 'habits_completed',
+          requirement_value: 1,
+          requirement_timeframe: null,
+          xp_reward: 50
+        },
+        {
+          id: 'week_warrior',
+          title: 'Week Warrior',
+          description: 'Maintain a 7-day streak',
+          icon: '🔥',
+          type: 'bronze',
+          requirement_type: 'streak',
+          requirement_value: 7,
+          requirement_timeframe: null,
+          xp_reward: 100
+        },
+        {
+          id: 'habit_master',
+          title: 'Habit Master',
+          description: 'Complete 30 habits total',
+          icon: '👑',
+          type: 'silver',
+          requirement_type: 'habits_completed',
+          requirement_value: 30,
+          requirement_timeframe: 'all_time',
+          xp_reward: 200
+        },
+        {
+          id: 'consistency_king',
+          title: 'Consistency King',
+          description: 'Achieve 90% consistency this month',
+          icon: '⚡',
+          type: 'gold',
+          requirement_type: 'consistency',
+          requirement_value: 90,
+          requirement_timeframe: 'month',
+          xp_reward: 300
+        },
+        {
+          id: 'level_five',
+          title: 'Rising Star',
+          description: 'Reach level 5',
+          icon: '⭐',
+          type: 'silver',
+          requirement_type: 'level',
+          requirement_value: 5,
+          requirement_timeframe: null,
+          xp_reward: 150
+        },
+        {
+          id: 'level_ten',
+          title: 'Habit Pro',
+          description: 'Reach level 10',
+          icon: '💪',
+          type: 'gold',
+          requirement_type: 'level',
+          requirement_value: 10,
+          requirement_timeframe: null,
+          xp_reward: 250
+        },
+        {
+          id: 'streak_master',
+          title: 'Streak Master',
+          description: 'Maintain a 30-day streak',
+          icon: '🏆',
+          type: 'gold',
+          requirement_type: 'streak',
+          requirement_value: 30,
+          requirement_timeframe: null,
+          xp_reward: 500
+        },
+        {
+          id: 'xp_collector',
+          title: 'XP Collector',
+          description: 'Earn 1000 total XP',
+          icon: '💎',
+          type: 'platinum',
+          requirement_type: 'total_xp',
+          requirement_value: 1000,
+          requirement_timeframe: null,
+          xp_reward: 200
+        }
+      ];
+
+      for (const achievement of defaultAchievements) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO achievements 
+           (id, title, description, icon, type, requirement_type, requirement_value, requirement_timeframe, xp_reward) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            achievement.id,
+            achievement.title,
+            achievement.description,
+            achievement.icon,
+            achievement.type,
+            achievement.requirement_type,
+            achievement.requirement_value,
+            achievement.requirement_timeframe,
+            achievement.xp_reward
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error initializing achievements:', error);
+    }
+  };
+
+  const getAllAchievements = async (): Promise<Achievement[]> => {
+    try {
+      const achievements = await db.getAllAsync(`
+        SELECT a.*, ua.unlocked_at, ua.xp_earned as earned_xp,
+               CASE WHEN ua.achievement_id IS NOT NULL THEN 1 ELSE 0 END as is_unlocked
+        FROM achievements a
+        LEFT JOIN user_achievements ua ON a.id = ua.achievement_id
+        ORDER BY 
+          CASE a.type 
+            WHEN 'bronze' THEN 1 
+            WHEN 'silver' THEN 2 
+            WHEN 'gold' THEN 3 
+            WHEN 'platinum' THEN 4 
+          END,
+          a.requirement_value
+      `) as Array<{
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        type: string;
+        requirement_type: string;
+        requirement_value: number;
+        requirement_timeframe: string | null;
+        xp_reward: number;
+        unlocked_at: string | null;
+        earned_xp: number | null;
+        is_unlocked: number;
+      }>;
+
+      return achievements.map(a => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        icon: a.icon,
+        type: a.type as 'bronze' | 'silver' | 'gold' | 'platinum',
+        requirement: {
+          type: a.requirement_type as 'streak' | 'habits_completed' | 'level' | 'consistency' | 'total_xp',
+          value: a.requirement_value,
+          timeframe: a.requirement_timeframe as 'day' | 'week' | 'month' | 'all_time' | undefined
+        },
+        xp_reward: a.xp_reward,
+        unlocked_at: a.unlocked_at || undefined,
+        is_unlocked: Boolean(a.is_unlocked)
+      }));
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      return [];
+    }
+  };
+
+  const unlockAchievement = async (achievementId: string) => {
+    try {
+      const achievement = await db.getFirstAsync(
+        'SELECT * FROM achievements WHERE id = ?',
+        [achievementId]
+      ) as {
+        id: string;
+        xp_reward: number;
+      } | null;
+
+      if (!achievement) return false;
+
+      // Check if already unlocked
+      const existing = await db.getFirstAsync(
+        'SELECT * FROM user_achievements WHERE achievement_id = ?',
+        [achievementId]
+      );
+
+      if (existing) return false;
+
+      // Unlock achievement
+      await db.runAsync(
+        'INSERT INTO user_achievements (achievement_id, xp_earned) VALUES (?, ?)',
+        [achievementId, achievement.xp_reward]
+      );
+
+      // Award XP
+      await updateUserXP(achievement.xp_reward);
+
+      return true;
+    } catch (error) {
+      console.error('Error unlocking achievement:', error);
+      return false;
+    }
+  };
+
+  const checkAndUnlockAchievements = async () => {
+    try {
+      const [userStats, habits, achievements] = await Promise.all([
+        getUserStats(),
+        getHabits(),
+        getAllAchievements()
+      ]);
+
+      if (!userStats) return [];
+
+      const unlockedAchievements: string[] = [];
+
+      for (const achievement of achievements) {
+        if (achievement.is_unlocked) continue;
+
+        let shouldUnlock = false;
+
+        switch (achievement.requirement.type) {
+          case 'level':
+            shouldUnlock = userStats.level >= achievement.requirement.value;
+            break;
+
+          case 'total_xp':
+            shouldUnlock = userStats.xp >= achievement.requirement.value;
+            break;
+
+          case 'streak':
+            // Check if any habit has the required streak
+            for (const habit of habits) {
+              const streak = await getHabitStreak(habit.id, new Date().toISOString().split('T')[0]);
+              if (streak >= achievement.requirement.value) {
+                shouldUnlock = true;
+                break;
+              }
+            }
+            break;
+
+          case 'habits_completed':
+            if (achievement.requirement.timeframe === 'all_time') {
+              const totalCompleted = await db.getFirstAsync(
+                'SELECT COUNT(*) as count FROM habit_logs WHERE completed = 1'
+              ) as { count: number };
+              shouldUnlock = totalCompleted.count >= achievement.requirement.value;
+            } else {
+              // Default to today
+              const todayCompleted = await db.getFirstAsync(
+                'SELECT COUNT(*) as count FROM habit_logs WHERE completed = 1 AND date = ?',
+                [new Date().toISOString().split('T')[0]]
+              ) as { count: number };
+              shouldUnlock = todayCompleted.count >= achievement.requirement.value;
+            }
+            break;
+
+          case 'consistency':
+            if (achievement.requirement.timeframe === 'month') {
+              // Calculate this month's consistency
+              const now = new Date();
+              const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+              
+              const totalDays = endOfMonth.getDate();
+              const completedDays = await db.getFirstAsync(
+                `SELECT COUNT(DISTINCT date) as count 
+                 FROM habit_logs 
+                 WHERE completed = 1 
+                 AND date BETWEEN ? AND ?`,
+                [startOfMonth.toISOString().split('T')[0], endOfMonth.toISOString().split('T')[0]]
+              ) as { count: number };
+              
+              const consistency = (completedDays.count / totalDays) * 100;
+              shouldUnlock = consistency >= achievement.requirement.value;
+            }
+            break;
+        }
+
+        if (shouldUnlock) {
+          const unlocked = await unlockAchievement(achievement.id);
+          if (unlocked) {
+            unlockedAchievements.push(achievement.id);
+          }
+        }
+      }
+
+      return unlockedAchievements;
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      return [];
+    }
+  };
+
+  const initializeSampleHabits = async () => {
+    try {
+      // Check if habits already exist
+      const existingHabits = await getHabits();
+      if (existingHabits.length > 0) return;
+
+      // Add sample habits for testing
+      const sampleHabits = [
+        {
+          title: "Morning Meditation",
+          description: "Start the day with 10 minutes of mindfulness",
+          emoji: "🧘",
+          category: "Mindfulness & Mental Health",
+          frequency: "daily" as const,
+          time: "07:00"
+        },
+        {
+          title: "Read for 30 minutes",
+          description: "Read books to expand knowledge and vocabulary",
+          emoji: "📖",
+          category: "Study & Learning",
+          frequency: "daily" as const,
+          time: "20:00"
+        },
+        {
+          title: "Exercise",
+          description: "Get moving with any form of physical activity",
+          emoji: "🏃‍♂️",
+          category: "Health & Fitness",
+          frequency: "daily" as const,
+          time: "18:00"
+        },
+        {
+          title: "Drink 8 glasses of water",
+          description: "Stay hydrated throughout the day",
+          emoji: "💧",
+          category: "Health & Fitness",
+          frequency: "daily" as const,
+          time: "09:00"
+        }
+      ];
+
+      for (const habit of sampleHabits) {
+        await addHabit(habit);
+      }
+
+      console.log('Sample habits initialized');
+    } catch (error) {
+      console.error('Error initializing sample habits:', error);
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -286,5 +702,9 @@ export const useDatabase = () => {
     calculateLevel,
     getXPForNextLevel,
     getXPProgress,
+    getAllAchievements,
+    unlockAchievement,
+    checkAndUnlockAchievements,
+    initializeSampleHabits,
   };
 }; 

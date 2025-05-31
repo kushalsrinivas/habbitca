@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Do not implement anything until you are 95% confident in the intended design. Ask follow-up questions if any part of the flow is unclear.

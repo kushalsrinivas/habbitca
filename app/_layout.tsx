@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -21,30 +22,32 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={[
-          "#0F0F0F", // Deep black
-          "#1A1A2E", // Dark blue-purple
-          "#16213E", // Navy blue
-          "#0F3460", // Deep blue
-          "#1A1A2E", // Back to dark blue-purple
-          "#0F0F0F", // Deep black
-        ]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-      <SQLiteProvider databaseName="habittracker.db">
-        <ThemeProvider value={DarkTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="light" />
-        </ThemeProvider>
-      </SQLiteProvider>
-    </View>
+    <GestureHandlerRootView style={styles.container}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={[
+            "#0F0F0F", // Deep black
+            "#1A1A2E", // Dark blue-purple
+            "#16213E", // Navy blue
+            "#0F3460", // Deep blue
+            "#1A1A2E", // Back to dark blue-purple
+            "#0F0F0F", // Deep black
+          ]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <SQLiteProvider databaseName="habittracker.db">
+          <ThemeProvider value={DarkTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="light" />
+          </ThemeProvider>
+        </SQLiteProvider>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
