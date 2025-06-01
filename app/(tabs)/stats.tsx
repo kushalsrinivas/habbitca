@@ -1,5 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import { format } from "date-fns";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   RefreshControl,
   SafeAreaView,
@@ -10,16 +11,65 @@ import {
 } from "react-native";
 
 import { GlassCard } from "@/components/ui/GlassCard";
+import { HabitHeatmap } from "@/components/ui/HabitHeatmap";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
-import { type UserStats, useDatabase } from "@/hooks/useDatabase";
+import {
+  type Habit,
+  type HabitLog,
+  type UserStats,
+  useDatabase,
+} from "@/hooks/useDatabase";
+
+interface HabitStatsData {
+  habit: Habit;
+  currentStreak: number;
+  longestStreak: number;
+  totalCompleted: number;
+  allLogs: HabitLog[];
+}
 
 export default function StatsScreen() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [habitStatsData, setHabitStatsData] = useState<HabitStatsData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [totalHabits, setTotalHabits] = useState(0);
 
   const db = useDatabase();
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const calculateLongestStreak = (logs: HabitLog[]): number => {
+    if (logs.length === 0) return 0;
+
+    const completedLogs = logs
+      .filter((log) => log.completed)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let longestStreak = 0;
+    let currentStreak = 0;
+    let lastDate: Date | null = null;
+
+    for (const log of completedLogs) {
+      const logDate = new Date(log.date);
+
+      if (lastDate) {
+        const daysDiff = Math.floor(
+          (logDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (daysDiff === 1) {
+          currentStreak++;
+        } else {
+          longestStreak = Math.max(longestStreak, currentStreak);
+          currentStreak = 1;
+        }
+      } else {
+        currentStreak = 1;
+      }
+
+      lastDate = logDate;
+    }
+
+    return Math.max(longestStreak, currentStreak);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -30,16 +80,56 @@ export default function StatsScreen() {
 
       setUserStats(statsData);
       setTotalHabits(habitsData.length);
+
+      if (habitsData.length === 0) {
+        setHabitStatsData([]);
+        return;
+      }
+
+      // Load detailed stats for each habit including all logs for heatmap
+      const habitStatsPromises = habitsData.map(async (habit) => {
+        const [allLogs, currentStreak] = await Promise.all([
+          db.getHabitLogsForHeatmap(habit.id),
+          db.getHabitStreak(habit.id, today),
+        ]);
+
+        const longestStreak = calculateLongestStreak(allLogs);
+        const totalCompleted = allLogs.filter((log) => log.completed).length;
+
+        return {
+          habit,
+          currentStreak,
+          longestStreak,
+          totalCompleted,
+          allLogs,
+        };
+      });
+
+      const habitStats = await Promise.all(habitStatsPromises);
+      setHabitStatsData(habitStats);
     } catch (error) {
       console.error("Error loading stats:", error);
     }
-  }, [db]);
+  }, [db, today]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   };
+
+  // Listen for database changes to update in real-time
+  useEffect(() => {
+    const handleDataChange = () => {
+      loadData();
+    };
+
+    db.onDataChange(handleDataChange);
+
+    return () => {
+      db.offDataChange(handleDataChange);
+    };
+  }, [db, loadData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,11 +148,6 @@ export default function StatsScreen() {
     if (level >= 10) return "Habit Pro 💪";
     if (level >= 5) return "Habit Builder 🔨";
     return "Habit Beginner 🌱";
-  };
-
-  const getNextLevelXP = () => {
-    if (!userStats) return 100;
-    return db.getXPForNextLevel(userStats.level);
   };
 
   const xpProgress = getXPProgress();
@@ -196,6 +281,67 @@ export default function StatsScreen() {
           </View>
         </GlassCard>
 
+        {/* Habit Heatmaps */}
+        <View style={styles.habitsSection}>
+          <Text style={styles.sectionTitle}>Habit Consistency</Text>
+
+          {habitStatsData.length === 0 ? (
+            <GlassCard style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No habits to display</Text>
+              <Text style={styles.emptySubtext}>
+                Create some habits to see your consistency patterns!
+              </Text>
+            </GlassCard>
+          ) : (
+            habitStatsData.map((habitData) => (
+              <GlassCard key={habitData.habit.id} style={styles.habitCard}>
+                {/* Habit Header */}
+                <View style={styles.habitHeader}>
+                  <Text style={styles.habitEmoji}>{habitData.habit.emoji}</Text>
+                  <View style={styles.habitInfo}>
+                    <Text style={styles.habitTitle}>
+                      {habitData.habit.title}
+                    </Text>
+                    <Text style={styles.habitTime}>
+                      ⏰ {habitData.habit.time}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Heatmap */}
+                <View style={styles.heatmapSection}>
+                  <HabitHeatmap
+                    habitLogs={habitData.allLogs}
+                    habitCreatedAt={habitData.habit.created_at}
+                  />
+                </View>
+
+                {/* Stats Row */}
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {habitData.currentStreak}
+                    </Text>
+                    <Text style={styles.statLabel}>Current Streak</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {habitData.longestStreak}
+                    </Text>
+                    <Text style={styles.statLabel}>Best Streak</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {habitData.totalCompleted}
+                    </Text>
+                    <Text style={styles.statLabel}>Days Completed</Text>
+                  </View>
+                </View>
+              </GlassCard>
+            ))
+          )}
+        </View>
+
         {/* XP Formula Explanation */}
         <GlassCard style={styles.formulaCard}>
           <Text style={styles.cardTitle}>XP System</Text>
@@ -225,7 +371,7 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
+    backgroundColor: Colors.dark.background1,
   },
   scrollView: {
     flex: 1,
@@ -354,6 +500,72 @@ const styles = StyleSheet.create({
   achievementDesc: {
     fontSize: 14,
     color: Colors.dark.textSecondary,
+  },
+  habitsSection: {
+    paddingBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  emptyCard: {
+    margin: 16,
+    padding: 32,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
+  },
+  habitCard: {
+    margin: 16,
+    marginBottom: 8,
+    padding: 20,
+  },
+  habitHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  habitEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  habitInfo: {
+    flex: 1,
+  },
+  habitTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginBottom: 2,
+  },
+  habitTime: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+  },
+  heatmapSection: {
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 16,
+    backgroundColor: Colors.dark.clay.background,
+    borderRadius: 12,
+  },
+  statItem: {
+    alignItems: "center",
   },
   formulaCard: {
     margin: 16,

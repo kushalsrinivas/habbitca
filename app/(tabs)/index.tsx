@@ -1,8 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { format } from "date-fns";
-import React, { useCallback, useState } from "react";
+import { format, subDays } from "date-fns";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -10,28 +12,202 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 
 import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { HabitCard } from "@/components/ui/HabitCard";
 import { HabitCreationBottomSheet } from "@/components/ui/HabitCreationBottomSheet";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
 import {
   type Achievement,
   type Habit,
+  type HabitLog,
   type UserStats,
   useDatabase,
 } from "@/hooks/useDatabase";
 
+interface HabitStats {
+  habit: Habit;
+  currentStreak: number;
+  longestStreak: number;
+  completionRate: number;
+  totalCompleted: number;
+  isCompletedToday: boolean;
+  recentLogs: HabitLog[];
+}
+
+interface HabitSectionProps {
+  stats: HabitStats;
+  onToggle: () => void;
+  getStreakColor: (streak: number) => string;
+  getAchievementBadges: (
+    stats: HabitStats
+  ) => { icon: string; title: string }[];
+}
+
+const HabitSection: React.FC<HabitSectionProps> = ({
+  stats,
+  onToggle,
+  getStreakColor,
+  getAchievementBadges,
+}) => {
+  const checkScale = useSharedValue(stats.isCompletedToday ? 1 : 0);
+
+  useEffect(() => {
+    checkScale.value = withSpring(stats.isCompletedToday ? 1 : 0, {
+      damping: 15,
+      stiffness: 300,
+    });
+  }, [stats.isCompletedToday, checkScale]);
+
+  const checkAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: checkScale.value }],
+    };
+  });
+
+  const badges = getAchievementBadges(stats);
+
+  // Generate mini calendar for past 7 days
+  const generateMiniCalendar = () => {
+    const days = [];
+    const today = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const date = subDays(today, i);
+      const dateStr = format(date, "yyyy-MM-dd");
+      const log = stats.recentLogs.find((log) => log.date === dateStr);
+      const isCompleted = log?.completed || false;
+
+      days.push({
+        date,
+        dateStr,
+        isCompleted,
+        dayLabel: format(date, "E").charAt(0), // First letter of day
+        dayNumber: format(date, "d"),
+      });
+    }
+
+    return days;
+  };
+
+  const miniCalendarDays = generateMiniCalendar();
+
+  return (
+    <GlassCard style={styles.habitCard}>
+      {/* Habit Header */}
+      <View style={styles.habitHeader}>
+        <View style={styles.habitInfo}>
+          <Text style={styles.habitEmoji}>{stats.habit.emoji}</Text>
+          <View style={styles.habitDetails}>
+            <Text style={styles.habitTitle}>{stats.habit.title}</Text>
+            <Text style={styles.habitTime}>⏰ {stats.habit.time}</Text>
+          </View>
+        </View>
+
+        <Pressable onPress={onToggle} style={styles.checkButton}>
+          <View
+            style={[
+              styles.checkCircle,
+              stats.isCompletedToday && styles.checkCircleCompleted,
+            ]}
+          >
+            <Animated.View style={checkAnimatedStyle}>
+              <Ionicons
+                name="checkmark"
+                size={20}
+                color={Colors.dark.textPrimary}
+              />
+            </Animated.View>
+          </View>
+        </Pressable>
+      </View>
+
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text
+            style={[
+              styles.statValue,
+              { color: getStreakColor(stats.currentStreak) },
+            ]}
+          >
+            {stats.currentStreak}
+          </Text>
+          <Text style={styles.statLabel}>Current Streak</Text>
+        </View>
+
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{stats.completionRate}%</Text>
+          <Text style={styles.statLabel}>30-Day Rate</Text>
+        </View>
+
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{stats.longestStreak}</Text>
+          <Text style={styles.statLabel}>Best Streak</Text>
+        </View>
+
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{stats.totalCompleted}</Text>
+          <Text style={styles.statLabel}>Total Done</Text>
+        </View>
+      </View>
+
+      {/* Mini Calendar */}
+      <View style={styles.miniCalendarSection}>
+        <Text style={styles.sectionTitle}>Past 7 Days</Text>
+        <View style={styles.miniCalendar}>
+          {miniCalendarDays.map((day) => (
+            <View key={day.dateStr} style={styles.miniCalendarDay}>
+              <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+              <View
+                style={[
+                  styles.dayCircle,
+                  day.isCompleted && styles.dayCircleCompleted,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    day.isCompleted && styles.dayNumberCompleted,
+                  ]}
+                >
+                  {day.dayNumber}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Achievement Badges */}
+      {badges.length > 0 && (
+        <View style={styles.badgesSection}>
+          <Text style={styles.sectionTitle}>Achievements</Text>
+          <View style={styles.badges}>
+            {badges.map((badge) => (
+              <View key={`${badge.icon}-${badge.title}`} style={styles.badge}>
+                <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                <Text style={styles.badgeTitle}>{badge.title}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </GlassCard>
+  );
+};
+
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [habitCompletions, setHabitCompletions] = useState<
-    Record<number, boolean>
-  >({});
-  const [habitStreaks, setHabitStreaks] = useState<Record<number, number>>({});
+  const [habitStats, setHabitStats] = useState<HabitStats[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [unlockedAchievement, setUnlockedAchievement] =
     useState<Achievement | null>(null);
@@ -40,6 +216,39 @@ export default function HabitsScreen() {
 
   const db = useDatabase();
   const today = format(new Date(), "yyyy-MM-dd");
+
+  const calculateLongestStreak = (logs: HabitLog[]): number => {
+    if (logs.length === 0) return 0;
+
+    const completedLogs = logs
+      .filter((log) => log.completed)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let longestStreak = 0;
+    let currentStreak = 0;
+    let lastDate: Date | null = null;
+
+    for (const log of completedLogs) {
+      const logDate = new Date(log.date);
+
+      if (lastDate) {
+        const daysDiff = Math.floor(
+          (logDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (daysDiff === 1) {
+          currentStreak++;
+        } else {
+          longestStreak = Math.max(longestStreak, currentStreak);
+          currentStreak = 1;
+        }
+      } else {
+        currentStreak = 1;
+      }
+
+      lastDate = logDate;
+    }
+
+    return Math.max(longestStreak, currentStreak);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -56,21 +265,54 @@ export default function HabitsScreen() {
       setHabits(habitsData);
       setUserStats(statsData);
 
-      // Load completion status and streaks for each habit
-      const completions: Record<number, boolean> = {};
-      const streaks: Record<number, number> = {};
-
-      for (const habit of habitsData) {
-        const [isCompleted, streak] = await Promise.all([
-          db.getHabitCompletion(habit.id, today),
-          db.getHabitStreak(habit.id, today),
-        ]);
-        completions[habit.id] = isCompleted;
-        streaks[habit.id] = streak;
+      if (habitsData.length === 0) {
+        setHabitStats([]);
+        return;
       }
 
-      setHabitCompletions(completions);
-      setHabitStreaks(streaks);
+      // Calculate detailed stats for each habit
+      const statsPromises = habitsData.map(async (habit) => {
+        // Get logs for the past 30 days for stats calculation
+        const endDate = format(new Date(), "yyyy-MM-dd");
+        const startDate = format(subDays(new Date(), 30), "yyyy-MM-dd");
+
+        const [logs, currentStreak, isCompletedToday] = await Promise.all([
+          db.getHabitLogs(habit.id, startDate, endDate),
+          db.getHabitStreak(habit.id, today),
+          db.getHabitCompletion(habit.id, today),
+        ]);
+
+        // Calculate completion rate (past 30 days)
+        const totalDays = 30;
+        const completedDays = logs.filter((log) => log.completed).length;
+        const completionRate =
+          totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+
+        // Calculate longest streak from all logs
+        const allLogs = await db.getHabitLogs(habit.id, "2020-01-01", endDate);
+        const longestStreak = calculateLongestStreak(allLogs);
+
+        // Get recent 7 days for mini calendar
+        const recentStartDate = format(subDays(new Date(), 6), "yyyy-MM-dd");
+        const recentLogs = await db.getHabitLogs(
+          habit.id,
+          recentStartDate,
+          endDate
+        );
+
+        return {
+          habit,
+          currentStreak,
+          longestStreak,
+          completionRate,
+          totalCompleted: allLogs.filter((log) => log.completed).length,
+          isCompletedToday,
+          recentLogs,
+        };
+      });
+
+      const stats = await Promise.all(statsPromises);
+      setHabitStats(stats);
     } catch (error) {
       console.error("Error loading data:", error);
       Alert.alert("Error", "Failed to load habits data");
@@ -91,35 +333,45 @@ export default function HabitsScreen() {
 
   const handleToggleHabit = async (habitId: number) => {
     try {
-      const isCurrentlyCompleted = habitCompletions[habitId];
+      const habitStat = habitStats.find((stat) => stat.habit.id === habitId);
+      if (!habitStat) return;
 
-      if (isCurrentlyCompleted) {
+      if (habitStat.isCompletedToday) {
         await db.uncompleteHabit(habitId, today);
       } else {
         await db.completeHabit(habitId, today);
-
-        // Check for newly unlocked achievements
-        const newAchievements = await db.checkAndUnlockAchievements();
-        if (newAchievements.length > 0) {
-          // Show the first unlocked achievement
-          const achievements = await db.getAllAchievements();
-          const unlockedAchievement = achievements.find(
-            (a) => newAchievements.includes(a.id) && a.is_unlocked
-          );
-
-          if (unlockedAchievement) {
-            setUnlockedAchievement(unlockedAchievement);
-            setShowAchievementModal(true);
-          }
-        }
       }
 
-      // Reload data to get updated stats
+      // Reload data to reflect changes
       await loadData();
     } catch (error) {
       console.error("Error toggling habit:", error);
-      Alert.alert("Error", "Failed to update habit");
     }
+  };
+
+  const getStreakColor = (streak: number) => {
+    if (streak === 0) return Colors.dark.streak.none;
+    if (streak < 7) return Colors.dark.streak.low;
+    if (streak < 21) return Colors.dark.streak.medium;
+    if (streak < 50) return Colors.dark.streak.high;
+    return Colors.dark.streak.max;
+  };
+
+  const getAchievementBadges = (stats: HabitStats) => {
+    const badges = [];
+
+    if (stats.currentStreak >= 7)
+      badges.push({ icon: "🔥", title: "Week Warrior" });
+    if (stats.currentStreak >= 30)
+      badges.push({ icon: "🏆", title: "Month Master" });
+    if (stats.longestStreak >= 50)
+      badges.push({ icon: "👑", title: "Streak King" });
+    if (stats.completionRate >= 90)
+      badges.push({ icon: "⚡", title: "Consistent" });
+    if (stats.totalCompleted >= 100)
+      badges.push({ icon: "💎", title: "Century Club" });
+
+    return badges;
   };
 
   const handleAddHabit = () => {
@@ -214,13 +466,15 @@ export default function HabitsScreen() {
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {Object.values(habitCompletions).filter(Boolean).length}
+                {habitStats.filter((hs) => hs.isCompletedToday).length}
               </Text>
               <Text style={styles.statLabel}>Completed Today</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
-                {Math.max(...Object.values(habitStreaks), 0)}
+                {habitStats.length > 0
+                  ? Math.max(...habitStats.map((hs) => hs.currentStreak), 0)
+                  : 0}
               </Text>
               <Text style={styles.statLabel}>Best Streak</Text>
             </View>
@@ -239,23 +493,23 @@ export default function HabitsScreen() {
 
         {/* Habits List */}
         <View style={styles.habitsSection}>
-          <Text style={styles.sectionTitle}>Today's Habits</Text>
+          <Text style={styles.sectionTitle}>Today&apos;s Habits</Text>
 
-          {habits.length === 0 ? (
+          {habitStats.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
               <Text style={styles.emptyText}>Loading your habits...</Text>
               <Text style={styles.emptySubtext}>
-                We're setting up some sample habits to get you started!
+                We&apos;re setting up some sample habits to get you started!
               </Text>
             </GlassCard>
           ) : (
-            habits.map((habit) => (
-              <HabitCard
-                key={habit.id}
-                habit={habit}
-                isCompleted={habitCompletions[habit.id] || false}
-                streak={habitStreaks[habit.id] || 0}
-                onToggleComplete={() => handleToggleHabit(habit.id)}
+            habitStats.map((stats) => (
+              <HabitSection
+                key={stats.habit.id}
+                stats={stats}
+                onToggle={() => handleToggleHabit(stats.habit.id)}
+                getStreakColor={getStreakColor}
+                getAchievementBadges={getAchievementBadges}
               />
             ))
           )}
@@ -331,19 +585,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     marginTop: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.dark.clay.background,
+    borderRadius: 12,
   },
   statItem: {
     alignItems: "center",
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
     color: Colors.dark.textPrimary,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.dark.textSecondary,
-    marginTop: 4,
+    textAlign: "center",
   },
   addButtonContainer: {
     paddingHorizontal: 16,
@@ -353,8 +611,8 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 14,
+    fontWeight: "600",
     color: Colors.dark.textPrimary,
     marginHorizontal: 16,
     marginBottom: 8,
@@ -375,5 +633,121 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     textAlign: "center",
     marginBottom: 4,
+  },
+  habitCard: {
+    margin: 16,
+    marginBottom: 8,
+    padding: 20,
+  },
+  habitHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  habitInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  habitEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  habitDetails: {
+    flex: 1,
+  },
+  habitTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
+    marginBottom: 2,
+  },
+  habitTime: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+  },
+  checkButton: {
+    padding: 4,
+  },
+  checkCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: Colors.dark.clay.border,
+    backgroundColor: Colors.dark.clay.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkCircleCompleted: {
+    backgroundColor: Colors.dark.success,
+    borderColor: Colors.dark.success,
+  },
+  miniCalendarSection: {
+    marginBottom: 16,
+  },
+  miniCalendar: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 8,
+  },
+  miniCalendarDay: {
+    alignItems: "center",
+  },
+  dayLabel: {
+    fontSize: 10,
+    color: Colors.dark.textSecondary,
+    marginBottom: 4,
+  },
+  dayCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.dark.clay.background,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+  },
+  dayCircleCompleted: {
+    backgroundColor: Colors.dark.success,
+    borderColor: Colors.dark.success,
+  },
+  dayNumber: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    fontWeight: "500",
+  },
+  dayNumberCompleted: {
+    color: Colors.dark.textPrimary,
+    fontWeight: "bold",
+  },
+  badgesSection: {
+    marginTop: 4,
+  },
+  badges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.dark.clay.background,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+  },
+  badgeIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  badgeTitle: {
+    fontSize: 10,
+    color: Colors.dark.textSecondary,
+    fontWeight: "500",
   },
 });

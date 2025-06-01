@@ -1,5 +1,32 @@
 import { useSQLiteContext } from 'expo-sqlite';
 
+// Simple event emitter for database changes
+class DatabaseEventEmitter {
+  private listeners: { [key: string]: (() => void)[] } = {};
+
+  on(event: string, callback: () => void) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+
+  off(event: string, callback: () => void) {
+    if (!this.listeners[event]) return;
+    this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+  }
+
+  emit(event: string) {
+    if (!this.listeners[event]) return;
+    for (const callback of this.listeners[event]) {
+      callback();
+    }
+  }
+}
+
+// Global event emitter instance
+const dbEventEmitter = new DatabaseEventEmitter();
+
 export interface Habit {
   id: number;
   title: string;
@@ -156,6 +183,10 @@ export const useDatabase = () => {
         'INSERT INTO habits (title, description, emoji, category, frequency, time) VALUES (?, ?, ?, ?, ?, ?)',
         [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time]
       );
+      
+      // Emit event to notify all screens of data change
+      dbEventEmitter.emit('habitDataChanged');
+      
       return result.lastInsertRowId;
     } catch (error) {
       console.error('Error adding habit:', error);
@@ -176,6 +207,9 @@ export const useDatabase = () => {
   const deleteHabit = async (habitId: number) => {
     try {
       await db.runAsync('UPDATE habits SET is_active = 0 WHERE id = ?', [habitId]);
+      
+      // Emit event to notify all screens of data change
+      dbEventEmitter.emit('habitDataChanged');
     } catch (error) {
       console.error('Error deleting habit:', error);
       throw error;
@@ -203,6 +237,9 @@ export const useDatabase = () => {
       // Check for new achievements
       await checkAndUnlockAchievements();
       
+      // Emit event to notify all screens of data change
+      dbEventEmitter.emit('habitDataChanged');
+      
       return xpEarned;
     } catch (error) {
       console.error('Error completing habit:', error);
@@ -225,6 +262,9 @@ export const useDatabase = () => {
         
         // Subtract XP
         await updateUserXP(-log.xp_earned);
+        
+        // Emit event to notify all screens of data change
+        dbEventEmitter.emit('habitDataChanged');
       }
     } catch (error) {
       console.error('Error uncompleting habit:', error);
@@ -687,6 +727,20 @@ export const useDatabase = () => {
     }
   };
 
+  // Get all habit logs for heatmap (optimized for performance)
+  const getHabitLogsForHeatmap = async (habitId: number): Promise<HabitLog[]> => {
+    try {
+      const result = await db.getAllAsync(
+        'SELECT * FROM habit_logs WHERE habit_id = ? ORDER BY date',
+        [habitId]
+      );
+      return result as HabitLog[];
+    } catch (error) {
+      console.error('Error fetching habit logs for heatmap:', error);
+      return [];
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -697,6 +751,7 @@ export const useDatabase = () => {
     getHabitCompletion,
     getHabitStreak,
     getHabitLogs,
+    getHabitLogsForHeatmap,
     getUserStats,
     updateUserXP,
     calculateLevel,
@@ -706,5 +761,8 @@ export const useDatabase = () => {
     unlockAchievement,
     checkAndUnlockAchievements,
     initializeSampleHabits,
+    // Event system for real-time updates
+    onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),
+    offDataChange: (callback: () => void) => dbEventEmitter.off('habitDataChanged', callback),
   };
 }; 
