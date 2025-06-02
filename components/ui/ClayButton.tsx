@@ -46,13 +46,6 @@ export const ClayButton: React.FC<ClayButtonProps> = ({
           }),
         },
       ],
-      shadowOffset: {
-        width: pressed.value ? 2 : -4,
-        height: pressed.value ? 2 : -4,
-      },
-      shadowOpacity: pressed.value ? 0.4 : 0.6,
-      shadowRadius: pressed.value ? 4 : 8,
-      elevation: pressed.value ? 4 : 8,
     };
   });
 

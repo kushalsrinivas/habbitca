@@ -28,8 +28,9 @@ import {
   type Achievement,
   type Habit,
   type HabitLog,
-  type UserStats,
+  type LevelUpData,
   useDatabase,
+  type UserStats,
 } from "@/hooks/useDatabase";
 
 interface HabitStats {
@@ -206,13 +207,14 @@ const HabitSection: React.FC<HabitSectionProps> = ({
 
 export default function HabitsScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [habitStats, setHabitStats] = useState<HabitStats[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAddHabitVisible, setIsAddHabitVisible] = useState(false);
+  const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [unlockedAchievement, setUnlockedAchievement] =
     useState<Achievement | null>(null);
-  const [showAchievementModal, setShowAchievementModal] = useState(false);
-  const [isAddHabitVisible, setIsAddHabitVisible] = useState(false);
+  const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
 
   const db = useDatabase();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -339,7 +341,30 @@ export default function HabitsScreen() {
       if (habitStat.isCompletedToday) {
         await db.uncompleteHabit(habitId, today);
       } else {
-        await db.completeHabit(habitId, today);
+        // Complete habit and check for level-up
+        const result = await db.completeHabit(habitId, today);
+
+        // Check if user leveled up
+        if (result.levelUpData) {
+          setLevelUpData(result.levelUpData);
+          setUnlockedAchievement(null);
+          setShowCelebrationModal(true);
+        }
+
+        // Check for new achievements (this might also trigger the modal)
+        const newAchievements = await db.checkAndUnlockAchievements();
+        if (newAchievements.length > 0 && !result.levelUpData) {
+          // Only show achievement modal if no level-up occurred
+          const achievements = await db.getAllAchievements();
+          const firstNewAchievement = achievements.find(
+            (a) => newAchievements.includes(a.id) && a.is_unlocked
+          );
+          if (firstNewAchievement) {
+            setUnlockedAchievement(firstNewAchievement);
+            setLevelUpData(null);
+            setShowCelebrationModal(true);
+          }
+        }
       }
 
       // Reload data to reflect changes
@@ -413,9 +438,10 @@ export default function HabitsScreen() {
     }
   };
 
-  const handleCloseAchievementModal = () => {
-    setShowAchievementModal(false);
+  const handleCloseCelebrationModal = () => {
+    setShowCelebrationModal(false);
     setUnlockedAchievement(null);
+    setLevelUpData(null);
   };
 
   const getXPProgress = () => {
@@ -516,11 +542,12 @@ export default function HabitsScreen() {
         </View>
       </ScrollView>
 
-      {/* Achievement Unlock Modal */}
+      {/* Enhanced Celebration Modal */}
       <AchievementUnlockModal
-        visible={showAchievementModal}
+        visible={showCelebrationModal}
         achievement={unlockedAchievement}
-        onClose={handleCloseAchievementModal}
+        levelUpData={levelUpData}
+        onClose={handleCloseCelebrationModal}
       />
 
       {/* Habit Creation Bottom Sheet */}

@@ -1,81 +1,311 @@
 import { BlurView } from "expo-blur";
-import React, { useEffect, useRef } from "react";
+import * as Haptics from "expo-haptics";
+import React, { useEffect, useState } from "react";
 import {
-  Animated,
   Dimensions,
   Modal,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  Extrapolate,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 import { Colors } from "@/constants/Colors";
-import type { Achievement } from "@/hooks/useDatabase";
+import type { Achievement, LevelUpData } from "@/hooks/useDatabase";
 import { ClayButton } from "./ClayButton";
 
 const { width, height } = Dimensions.get("window");
 
-interface AchievementUnlockModalProps {
+interface CelebrationModalProps {
   visible: boolean;
-  achievement: Achievement | null;
+  achievement?: Achievement | null;
+  levelUpData?: LevelUpData | null;
   onClose: () => void;
 }
+
+interface ParticleProps {
+  index: number;
+  type: "sparkle" | "confetti" | "star";
+}
+
+const Particle: React.FC<ParticleProps> = ({ index, type }) => {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    const startDelay = index * 100;
+    const angle = (index * 45) % 360;
+    const distance = 80 + (index % 3) * 40;
+
+    // Initial burst animation
+    translateX.value = withDelay(
+      startDelay,
+      withSpring(Math.cos((angle * Math.PI) / 180) * distance, {
+        damping: 15,
+        stiffness: 100,
+      })
+    );
+
+    translateY.value = withDelay(
+      startDelay,
+      withSpring(Math.sin((angle * Math.PI) / 180) * distance, {
+        damping: 15,
+        stiffness: 100,
+      })
+    );
+
+    scale.value = withDelay(
+      startDelay,
+      withSequence(
+        withSpring(1.2, { damping: 10, stiffness: 200 }),
+        withSpring(1, { damping: 15, stiffness: 150 })
+      )
+    );
+
+    opacity.value = withDelay(
+      startDelay,
+      withSequence(
+        withTiming(1, { duration: 300 }),
+        withDelay(1500, withTiming(0, { duration: 500 }))
+      )
+    );
+
+    rotation.value = withDelay(
+      startDelay,
+      withRepeat(withTiming(360, { duration: 2000 }), -1, false)
+    );
+  }, [index]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+        { rotate: `${rotation.value}deg` },
+      ],
+      opacity: opacity.value,
+    };
+  });
+
+  const getParticleEmoji = () => {
+    switch (type) {
+      case "sparkle":
+        return "✨";
+      case "confetti":
+        return ["🎉", "🎊", "🌟"][index % 3];
+      case "star":
+        return "⭐";
+      default:
+        return "✨";
+    }
+  };
+
+  return (
+    <Animated.View style={[styles.particle, animatedStyle]}>
+      <Text style={styles.particleText}>{getParticleEmoji()}</Text>
+    </Animated.View>
+  );
+};
 
 export function AchievementUnlockModal({
   visible,
   achievement,
+  levelUpData,
   onClose,
-}: AchievementUnlockModalProps) {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const sparkleAnim = useRef(new Animated.Value(0)).current;
+}: CelebrationModalProps) {
+  const [showSharePreview, setShowSharePreview] = useState(false);
+
+  // Animation values
+  const backdropOpacity = useSharedValue(0);
+  const modalScale = useSharedValue(0);
+  const badgeScale = useSharedValue(0);
+  const badgeRotation = useSharedValue(0);
+  const xpBarWidth = useSharedValue(0);
+  const xpBarGlow = useSharedValue(0);
+  const titleOpacity = useSharedValue(0);
+  const titleTranslateY = useSharedValue(30);
+  const rewardsOpacity = useSharedValue(0);
+  const rewardsTranslateY = useSharedValue(20);
+  const buttonOpacity = useSharedValue(0);
+
+  const isLevelUp = !!levelUpData;
+  const isAchievement = !!achievement;
 
   useEffect(() => {
-    if (visible && achievement) {
-      // Reset animations
-      scaleAnim.setValue(0);
-      rotateAnim.setValue(0);
-      sparkleAnim.setValue(0);
+    if (visible && (achievement || levelUpData)) {
+      // Haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Reset all animations
+      backdropOpacity.value = 0;
+      modalScale.value = 0;
+      badgeScale.value = 0;
+      badgeRotation.value = 0;
+      xpBarWidth.value = 0;
+      xpBarGlow.value = 0;
+      titleOpacity.value = 0;
+      titleTranslateY.value = 30;
+      rewardsOpacity.value = 0;
+      rewardsTranslateY.value = 20;
+      buttonOpacity.value = 0;
 
       // Start celebration animation sequence
-      Animated.sequence([
-        // Scale in the medal
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        // Rotate and sparkle
-        Animated.parallel([
-          Animated.timing(rotateAnim, {
-            toValue: 1,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-          Animated.loop(
-            Animated.sequence([
-              Animated.timing(sparkleAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-              }),
-              Animated.timing(sparkleAnim, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-              }),
-            ]),
-            { iterations: 3 }
-          ),
-        ]),
-      ]).start();
-    }
-  }, [visible, achievement, scaleAnim, rotateAnim, sparkleAnim]);
+      backdropOpacity.value = withTiming(1, { duration: 300 });
 
-  const getMedalColor = (type: Achievement["type"]) => {
-    switch (type) {
+      modalScale.value = withDelay(
+        200,
+        withSpring(1, {
+          damping: 15,
+          stiffness: 200,
+        })
+      );
+
+      // Badge animation with dramatic effect
+      badgeScale.value = withDelay(
+        500,
+        withSequence(
+          withSpring(1.3, { damping: 8, stiffness: 150 }),
+          withSpring(1, { damping: 12, stiffness: 200 })
+        )
+      );
+
+      badgeRotation.value = withDelay(
+        500,
+        withSequence(
+          withTiming(360, { duration: 800 }),
+          withSpring(0, { damping: 15, stiffness: 200 })
+        )
+      );
+
+      // XP bar animation for level-ups
+      if (isLevelUp) {
+        xpBarWidth.value = withDelay(
+          1000,
+          withSequence(
+            withTiming(100, { duration: 1000 }),
+            withTiming(0, { duration: 300 }),
+            withTiming((levelUpData.xpGained / 100) * 100, { duration: 800 })
+          )
+        );
+
+        xpBarGlow.value = withDelay(
+          1000,
+          withRepeat(
+            withSequence(
+              withTiming(1, { duration: 500 }),
+              withTiming(0.3, { duration: 500 })
+            ),
+            3,
+            true
+          )
+        );
+      }
+
+      // Title animation
+      titleOpacity.value = withDelay(800, withTiming(1, { duration: 600 }));
+      titleTranslateY.value = withDelay(
+        800,
+        withSpring(0, { damping: 15, stiffness: 200 })
+      );
+
+      // Rewards animation
+      rewardsOpacity.value = withDelay(1200, withTiming(1, { duration: 600 }));
+      rewardsTranslateY.value = withDelay(
+        1200,
+        withSpring(0, { damping: 15, stiffness: 200 })
+      );
+
+      // Button animation
+      buttonOpacity.value = withDelay(1600, withTiming(1, { duration: 400 }));
+    }
+  }, [visible, achievement, levelUpData]);
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
+
+  const modalStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: modalScale.value }],
+  }));
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: badgeScale.value },
+      { rotate: `${badgeRotation.value}deg` },
+    ],
+  }));
+
+  const xpBarStyle = useAnimatedStyle(() => ({
+    width: `${xpBarWidth.value}%`,
+    shadowOpacity: interpolate(
+      xpBarGlow.value,
+      [0, 1],
+      [0.3, 0.8],
+      Extrapolate.CLAMP
+    ),
+  }));
+
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleOpacity.value,
+    transform: [{ translateY: titleTranslateY.value }],
+  }));
+
+  const rewardsStyle = useAnimatedStyle(() => ({
+    opacity: rewardsOpacity.value,
+    transform: [{ translateY: rewardsTranslateY.value }],
+  }));
+
+  const buttonStyle = useAnimatedStyle(() => ({
+    opacity: buttonOpacity.value,
+  }));
+
+  const handleShare = async () => {
+    try {
+      const message = isLevelUp
+        ? `🎉 Just reached Level ${levelUpData?.newLevel}! ${levelUpData?.levelTitle} 🚀 #HabitTracker #LevelUp`
+        : `🏆 Achievement Unlocked: ${achievement?.title}! ${achievement?.description} 🎯 #HabitTracker #Achievement`;
+
+      await Share.share({
+        message,
+        title: isLevelUp ? "Level Up!" : "Achievement Unlocked!",
+      });
+    } catch (error) {
+      console.error("Error sharing:", error);
+    }
+  };
+
+  const handleSharePreview = () => {
+    setShowSharePreview(true);
+    setTimeout(() => setShowSharePreview(false), 2000);
+  };
+
+  if (!achievement && !levelUpData) return null;
+
+  const getBadgeColor = () => {
+    if (isLevelUp) {
+      const level = levelUpData.newLevel;
+      if (level >= 20) return "#FFD700"; // Gold
+      if (level >= 10) return "#C0C0C0"; // Silver
+      return "#CD7F32"; // Bronze
+    }
+
+    switch (achievement?.type) {
       case "bronze":
         return "#CD7F32";
       case "silver":
@@ -89,134 +319,179 @@ export function AchievementUnlockModal({
     }
   };
 
-  const getMedalGradient = (type: Achievement["type"]) => {
-    switch (type) {
-      case "bronze":
-        return ["#CD7F32", "#8B4513"];
-      case "silver":
-        return ["#C0C0C0", "#808080"];
-      case "gold":
-        return ["#FFD700", "#FFA500"];
-      case "platinum":
-        return ["#E5E4E2", "#B8B8B8"];
-      default:
-        return ["#CD7F32", "#8B4513"];
-    }
+  const getMainIcon = () => {
+    if (isLevelUp) return "👑";
+    return achievement?.icon || "🏆";
   };
 
-  if (!achievement) return null;
+  const getTitle = () => {
+    if (isLevelUp) return `🎉 Level ${levelUpData.newLevel} Unlocked!`;
+    return "🏆 Achievement Unlocked!";
+  };
 
-  const scale = scaleAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const getSubtitle = () => {
+    if (isLevelUp) return levelUpData.levelTitle;
+    return achievement?.title || "";
+  };
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+  const getDescription = () => {
+    if (isLevelUp) {
+      return `You're on fire! Keep up the consistency and unlock your next reward soon.`;
+    }
+    return achievement?.description || "";
+  };
 
-  const sparkleOpacity = sparkleAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 1],
-  });
-
-  const sparkleScale = sparkleAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.8, 1.2],
-  });
+  const getRewards = () => {
+    if (isLevelUp) return levelUpData.levelRewards;
+    return [`+${achievement?.xp_reward} XP`];
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <BlurView intensity={20} style={styles.overlay}>
+      <Animated.View style={[styles.overlay, backdropStyle]}>
+        <BlurView intensity={20} style={StyleSheet.absoluteFill} />
+
+        {/* Particle System */}
+        <View style={styles.particleContainer}>
+          {Array.from({ length: 12 }, (_, i) => (
+            <Particle
+              key={i}
+              index={i}
+              type={i % 3 === 0 ? "sparkle" : i % 3 === 1 ? "confetti" : "star"}
+            />
+          ))}
+        </View>
+
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
         >
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.modalContainer, modalStyle]}>
             <TouchableOpacity activeOpacity={1} style={styles.modal}>
-              {/* Celebration Background */}
-              <View style={styles.celebrationContainer}>
-                {[...Array(8)].map((_, i) => (
-                  <Animated.View
-                    key={`sparkle-${i}`}
-                    style={[
-                      styles.sparkle,
-                      {
-                        transform: [
-                          { scale: sparkleScale },
-                          { rotate: `${i * 45}deg` },
-                        ],
-                        opacity: sparkleOpacity,
-                        top: height * 0.3 + Math.sin((i * Math.PI) / 4) * 100,
-                        left: width * 0.5 + Math.cos((i * Math.PI) / 4) * 100,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.sparkleText}>✨</Text>
-                  </Animated.View>
-                ))}
-              </View>
-
-              {/* Achievement Content */}
+              {/* Main Content */}
               <View style={styles.content}>
-                <Text style={styles.congratsText}>
-                  🎉 Achievement Unlocked! 🎉
-                </Text>
-
-                <Animated.View
-                  style={[
-                    styles.medalContainer,
-                    {
-                      backgroundColor: getMedalColor(achievement.type),
-                      transform: [{ scale }, { rotate }],
-                    },
-                  ]}
-                >
-                  <Text style={styles.achievementIcon}>{achievement.icon}</Text>
+                {/* Title */}
+                <Animated.View style={titleStyle}>
+                  <Text style={styles.congratsText}>{getTitle()}</Text>
                 </Animated.View>
 
+                {/* Badge/Level Display */}
+                <Animated.View
+                  style={[
+                    styles.badgeContainer,
+                    {
+                      backgroundColor: getBadgeColor(),
+                    },
+                    badgeStyle,
+                  ]}
+                >
+                  <Text style={styles.badgeIcon}>{getMainIcon()}</Text>
+                  {isLevelUp && (
+                    <View style={styles.levelNumber}>
+                      <Text style={styles.levelText}>
+                        {levelUpData.newLevel}
+                      </Text>
+                    </View>
+                  )}
+                </Animated.View>
+
+                {/* Type/Level Indicator */}
                 <View
                   style={[
                     styles.typeIndicator,
-                    { backgroundColor: getMedalColor(achievement.type) },
+                    { backgroundColor: getBadgeColor() },
                   ]}
                 >
                   <Text style={styles.typeText}>
-                    {achievement.type.toUpperCase()} MEDAL
+                    {isLevelUp
+                      ? "LEVEL UP!"
+                      : `${achievement?.type?.toUpperCase()} MEDAL`}
                   </Text>
                 </View>
 
-                <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                {/* Subtitle */}
+                <Animated.View style={titleStyle}>
+                  <Text style={styles.achievementTitle}>{getSubtitle()}</Text>
+                </Animated.View>
 
-                <Text style={styles.achievementDescription}>
-                  {achievement.description}
-                </Text>
-
-                <View style={styles.xpContainer}>
-                  <Text style={styles.xpText}>
-                    +{achievement.xp_reward} XP Earned!
+                {/* Description */}
+                <Animated.View style={titleStyle}>
+                  <Text style={styles.achievementDescription}>
+                    {getDescription()}
                   </Text>
-                </View>
+                </Animated.View>
 
-                <ClayButton
-                  title="Awesome!"
-                  onPress={onClose}
-                  variant="primary"
-                  size="large"
-                  style={styles.closeButton}
-                />
+                {/* XP Progress Bar (Level-ups only) */}
+                {isLevelUp && (
+                  <Animated.View style={styles.xpProgressContainer}>
+                    <View style={styles.xpProgressTrack}>
+                      <Animated.View
+                        style={[styles.xpProgressBar, xpBarStyle]}
+                      />
+                    </View>
+                    <Text style={styles.xpProgressText}>
+                      XP Overflow → New Level!
+                    </Text>
+                  </Animated.View>
+                )}
+
+                {/* Rewards Section */}
+                <Animated.View style={[styles.rewardsContainer, rewardsStyle]}>
+                  <Text style={styles.rewardsTitle}>
+                    {isLevelUp ? "🎁 Level Rewards:" : "🎁 Reward:"}
+                  </Text>
+                  {getRewards().map((reward, index) => (
+                    <View key={index} style={styles.rewardItem}>
+                      <Text style={styles.rewardText}>{reward}</Text>
+                    </View>
+                  ))}
+                </Animated.View>
+
+                {/* Action Buttons */}
+                <Animated.View style={[styles.buttonContainer, buttonStyle]}>
+                  <ClayButton
+                    title={isLevelUp ? "Continue" : "Awesome!"}
+                    onPress={onClose}
+                    variant="primary"
+                    size="large"
+                    style={styles.primaryButton}
+                  />
+
+                  <ClayButton
+                    title="Share Achievement"
+                    onPress={handleSharePreview}
+                    variant="secondary"
+                    size="medium"
+                    style={styles.shareButton}
+                  />
+                </Animated.View>
+
+                {/* Share Preview Mock */}
+                {showSharePreview && (
+                  <View style={styles.sharePreview}>
+                    <Text style={styles.sharePreviewText}>
+                      📱 Instagram Story Preview
+                    </Text>
+                    <View style={styles.mockStory}>
+                      <Text style={styles.mockStoryText}>
+                        {isLevelUp
+                          ? `Level ${levelUpData.newLevel}! 🚀`
+                          : `${achievement?.title}! 🏆`}
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </TouchableOpacity>
-      </BlurView>
+      </Animated.View>
     </Modal>
   );
 }
@@ -226,6 +501,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
   },
   backdrop: {
     flex: 1,
@@ -244,20 +520,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.dark.clay.border,
     overflow: "hidden",
   },
-  celebrationContainer: {
+  particleContainer: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: height * 0.3,
+    left: width * 0.5,
+    width: 1,
+    height: 1,
     zIndex: 1,
   },
-  sparkle: {
+  particle: {
     position: "absolute",
     zIndex: 2,
   },
-  sparkleText: {
-    fontSize: 20,
+  particleText: {
+    fontSize: 24,
   },
   content: {
     padding: 32,
@@ -265,68 +541,163 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   congratsText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     color: Colors.dark.primary,
     textAlign: "center",
     marginBottom: 24,
   },
-  medalContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  badgeContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowRadius: 16,
+    elevation: 12,
+    position: "relative",
   },
-  achievementIcon: {
-    fontSize: 48,
+  badgeIcon: {
+    fontSize: 56,
+  },
+  levelNumber: {
+    position: "absolute",
+    bottom: -8,
+    right: -8,
+    backgroundColor: Colors.dark.primary,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: Colors.dark.background2,
+  },
+  levelText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.dark.textPrimary,
   },
   typeIndicator: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   typeText: {
     fontSize: 12,
     fontWeight: "bold",
     color: Colors.dark.background,
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   achievementTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
-    color: Colors.dark.text,
+    color: Colors.dark.textPrimary,
     textAlign: "center",
     marginBottom: 12,
   },
   achievementDescription: {
     fontSize: 16,
-    color: Colors.dark.textMuted,
+    color: Colors.dark.textSecondary,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 24,
   },
-  xpContainer: {
-    backgroundColor: `${Colors.dark.primary}20`,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  xpProgressContainer: {
+    width: "100%",
+    marginBottom: 24,
+  },
+  xpProgressTrack: {
+    height: 8,
+    backgroundColor: Colors.dark.clay.background,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  xpProgressBar: {
+    height: "100%",
+    backgroundColor: Colors.dark.primary,
+    borderRadius: 4,
+    shadowColor: Colors.dark.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  xpProgressText: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  rewardsContainer: {
+    width: "100%",
+    backgroundColor: `${Colors.dark.primary}15`,
     borderRadius: 16,
+    padding: 20,
     marginBottom: 24,
   },
-  xpText: {
-    fontSize: 18,
+  rewardsTitle: {
+    fontSize: 16,
     fontWeight: "bold",
     color: Colors.dark.primary,
+    marginBottom: 12,
     textAlign: "center",
   },
-  closeButton: {
+  rewardItem: {
+    backgroundColor: `${Colors.dark.primary}20`,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  rewardText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.dark.textPrimary,
+    textAlign: "center",
+  },
+  buttonContainer: {
     width: "100%",
+    gap: 12,
+  },
+  primaryButton: {
+    width: "100%",
+  },
+  shareButton: {
+    width: "100%",
+  },
+  sharePreview: {
+    position: "absolute",
+    top: -100,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.dark.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+  },
+  sharePreviewText: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    marginBottom: 8,
+  },
+  mockStory: {
+    backgroundColor: "#E1306C",
+    borderRadius: 8,
+    padding: 12,
+    width: "80%",
+  },
+  mockStoryText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });

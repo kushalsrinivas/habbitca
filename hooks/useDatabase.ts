@@ -79,6 +79,15 @@ export interface UserAchievement {
   xp_earned: number;
 }
 
+export interface LevelUpData {
+  newLevel: number;
+  previousLevel: number;
+  xpGained: number;
+  totalXP: number;
+  levelTitle: string;
+  levelRewards: string[];
+}
+
 export const useDatabase = () => {
   const db = useSQLiteContext();
 
@@ -217,7 +226,7 @@ export const useDatabase = () => {
   };
 
   // Habit log operations
-  const completeHabit = async (habitId: number, date: string) => {
+  const completeHabit = async (habitId: number, date: string): Promise<{ xpEarned: number; levelUpData?: LevelUpData }> => {
     try {
       // Calculate XP based on streak
       const streak = await getHabitStreak(habitId, date);
@@ -231,8 +240,8 @@ export const useDatabase = () => {
         [habitId, date, xpEarned]
       );
 
-      // Update user stats
-      await updateUserXP(xpEarned);
+      // Update user stats and check for level up
+      const levelUpResult = await updateUserXP(xpEarned);
       
       // Check for new achievements
       await checkAndUnlockAchievements();
@@ -240,7 +249,10 @@ export const useDatabase = () => {
       // Emit event to notify all screens of data change
       dbEventEmitter.emit('habitDataChanged');
       
-      return xpEarned;
+      return {
+        xpEarned,
+        levelUpData: levelUpResult.leveledUp ? levelUpResult.levelUpData : undefined
+      };
     } catch (error) {
       console.error('Error completing habit:', error);
       throw error;
@@ -338,11 +350,12 @@ export const useDatabase = () => {
     }
   };
 
-  const updateUserXP = async (xpChange: number) => {
+  const updateUserXP = async (xpChange: number): Promise<{ leveledUp: boolean; levelUpData?: LevelUpData }> => {
     try {
       const currentStats = await getUserStats();
-      if (!currentStats) return;
+      if (!currentStats) return { leveledUp: false };
 
+      const previousLevel = currentStats.level;
       const newXP = Math.max(0, currentStats.xp + xpChange);
       const newLevel = calculateLevel(newXP);
 
@@ -350,10 +363,66 @@ export const useDatabase = () => {
         'UPDATE user_stats SET xp = ?, level = ? WHERE id = 1',
         [newXP, newLevel]
       );
+
+      // Check if user leveled up
+      if (newLevel > previousLevel) {
+        const levelTitle = getLevelTitle(newLevel);
+        const levelRewards = getLevelRewards(newLevel);
+        
+        return {
+          leveledUp: true,
+          levelUpData: {
+            newLevel,
+            previousLevel,
+            xpGained: xpChange,
+            totalXP: newXP,
+            levelTitle,
+            levelRewards
+          }
+        };
+      }
+
+      return { leveledUp: false };
     } catch (error) {
       console.error('Error updating user XP:', error);
       throw error;
     }
+  };
+
+  const getLevelTitle = (level: number): string => {
+    if (level >= 50) return "Habit Legend 🌟";
+    if (level >= 30) return "Habit Guru 🧘";
+    if (level >= 20) return "Habit Master 🏆";
+    if (level >= 15) return "Habit Expert 🎯";
+    if (level >= 10) return "Habit Pro 💪";
+    if (level >= 5) return "Habit Builder 🔨";
+    return "Habit Beginner 🌱";
+  };
+
+  const getLevelRewards = (level: number): string[] => {
+    const rewards: string[] = [];
+    
+    if (level % 5 === 0) {
+      rewards.push(`🎁 ${50 * level} Bonus XP`);
+    }
+    
+    if (level === 5) {
+      rewards.push("🎨 Focus Mode Badge");
+    } else if (level === 10) {
+      rewards.push("⚡ Streak Multiplier");
+    } else if (level === 15) {
+      rewards.push("🏅 Expert Badge");
+    } else if (level === 20) {
+      rewards.push("👑 Master Crown");
+    } else if (level >= 25 && level % 10 === 0) {
+      rewards.push("💎 Legendary Badge");
+    }
+    
+    if (level % 3 === 0 && level > 3) {
+      rewards.push("🌟 New Achievement Category");
+    }
+    
+    return rewards;
   };
 
   // XP and Level calculation formula
@@ -757,6 +826,8 @@ export const useDatabase = () => {
     calculateLevel,
     getXPForNextLevel,
     getXPProgress,
+    getLevelTitle,
+    getLevelRewards,
     getAllAchievements,
     unlockAchievement,
     checkAndUnlockAchievements,
