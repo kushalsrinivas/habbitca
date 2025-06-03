@@ -41,6 +41,14 @@ export default function RootLayout() {
           <ThemeProvider value={DarkTheme}>
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="celebration"
+                options={{
+                  headerShown: false,
+                  presentation: "fullScreenModal",
+                  animation: "slide_from_bottom",
+                }}
+              />
               <Stack.Screen name="+not-found" />
             </Stack>
             <StatusBar style="light" />

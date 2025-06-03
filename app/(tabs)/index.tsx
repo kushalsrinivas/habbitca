@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { format, subDays } from "date-fns";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -18,7 +19,6 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-import { AchievementUnlockModal } from "@/components/ui/AchievementUnlockModal";
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HabitCreationBottomSheet } from "@/components/ui/HabitCreationBottomSheet";
@@ -28,7 +28,6 @@ import {
   type Achievement,
   type Habit,
   type HabitLog,
-  type LevelUpData,
   useDatabase,
   type UserStats,
 } from "@/hooks/useDatabase";
@@ -211,10 +210,6 @@ export default function HabitsScreen() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isAddHabitVisible, setIsAddHabitVisible] = useState(false);
-  const [showCelebrationModal, setShowCelebrationModal] = useState(false);
-  const [unlockedAchievement, setUnlockedAchievement] =
-    useState<Achievement | null>(null);
-  const [levelUpData, setLevelUpData] = useState<LevelUpData | null>(null);
 
   const db = useDatabase();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -346,9 +341,12 @@ export default function HabitsScreen() {
 
         // Check if user leveled up
         if (result.levelUpData) {
-          setLevelUpData(result.levelUpData);
-          setUnlockedAchievement(null);
-          setShowCelebrationModal(true);
+          router.push({
+            pathname: "/celebration",
+            params: {
+              levelUpData: JSON.stringify(result.levelUpData),
+            },
+          });
         }
 
         // Check for new achievements (this might also trigger the modal)
@@ -360,9 +358,12 @@ export default function HabitsScreen() {
             (a) => newAchievements.includes(a.id) && a.is_unlocked
           );
           if (firstNewAchievement) {
-            setUnlockedAchievement(firstNewAchievement);
-            setLevelUpData(null);
-            setShowCelebrationModal(true);
+            router.push({
+              pathname: "/celebration",
+              params: {
+                achievement: JSON.stringify(firstNewAchievement),
+              },
+            });
           }
         }
       }
@@ -438,18 +439,36 @@ export default function HabitsScreen() {
     }
   };
 
-  const handleCloseCelebrationModal = () => {
-    setShowCelebrationModal(false);
-    setUnlockedAchievement(null);
-    setLevelUpData(null);
-  };
-
   const getXPProgress = () => {
     if (!userStats) return { current: 0, needed: 100, percentage: 0 };
     return db.getXPProgress(userStats.xp, userStats.level);
   };
 
   const xpProgress = getXPProgress();
+
+  // Test function to manually trigger achievement screen
+  const testAchievementScreen = () => {
+    const testAchievement: Achievement = {
+      id: "test",
+      title: "Test Achievement",
+      description: "This is a test achievement to verify the screen works",
+      icon: "🏆",
+      type: "gold",
+      requirement: {
+        type: "habits_completed",
+        value: 1,
+      },
+      xp_reward: 100,
+      is_unlocked: true,
+    };
+
+    router.push({
+      pathname: "/celebration",
+      params: {
+        achievement: JSON.stringify(testAchievement),
+      },
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -465,6 +484,15 @@ export default function HabitsScreen() {
           <Text style={styles.subtitle}>
             Build better habits, one day at a time
           </Text>
+
+          {/* Test button for achievement screen */}
+          <ClayButton
+            title="Test Achievement Screen"
+            onPress={testAchievementScreen}
+            variant="secondary"
+            size="small"
+            style={{ marginTop: 10 }}
+          />
         </View>
 
         {/* User Stats Dashboard */}
@@ -541,14 +569,6 @@ export default function HabitsScreen() {
           )}
         </View>
       </ScrollView>
-
-      {/* Enhanced Celebration Modal */}
-      <AchievementUnlockModal
-        visible={showCelebrationModal}
-        achievement={unlockedAchievement}
-        levelUpData={levelUpData}
-        onClose={handleCloseCelebrationModal}
-      />
 
       {/* Habit Creation Bottom Sheet */}
       <HabitCreationBottomSheet

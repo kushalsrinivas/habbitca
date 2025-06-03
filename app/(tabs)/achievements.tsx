@@ -209,7 +209,10 @@ export default function AchievementsScreen() {
               {lockedAchievements.map((achievement) => (
                 <GlassCard
                   key={achievement.id}
-                  style={[styles.achievementCard, styles.lockedCard]}
+                  style={StyleSheet.flatten([
+                    styles.achievementCard,
+                    styles.lockedCard,
+                  ])}
                 >
                   <View style={styles.achievementHeader}>
                     <View style={[styles.medalContainer, styles.lockedMedal]}>
