@@ -25,7 +25,6 @@ import { HabitCreationBottomSheet } from "@/components/ui/HabitCreationBottomShe
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
 import {
-  type Achievement,
   type Habit,
   type HabitLog,
   useDatabase,
@@ -446,30 +445,6 @@ export default function HabitsScreen() {
 
   const xpProgress = getXPProgress();
 
-  // Test function to manually trigger achievement screen
-  const testAchievementScreen = () => {
-    const testAchievement: Achievement = {
-      id: "test",
-      title: "Test Achievement",
-      description: "This is a test achievement to verify the screen works",
-      icon: "🏆",
-      type: "gold",
-      requirement: {
-        type: "habits_completed",
-        value: 1,
-      },
-      xp_reward: 100,
-      is_unlocked: true,
-    };
-
-    router.push({
-      pathname: "/celebration",
-      params: {
-        achievement: JSON.stringify(testAchievement),
-      },
-    });
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -484,15 +459,6 @@ export default function HabitsScreen() {
           <Text style={styles.subtitle}>
             Build better habits, one day at a time
           </Text>
-
-          {/* Test button for achievement screen */}
-          <ClayButton
-            title="Test Achievement Screen"
-            onPress={testAchievementScreen}
-            variant="secondary"
-            size="small"
-            style={{ marginTop: 10 }}
-          />
         </View>
 
         {/* User Stats Dashboard */}

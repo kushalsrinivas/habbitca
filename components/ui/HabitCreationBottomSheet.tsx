@@ -1,10 +1,16 @@
-import { Colors, clayStyles } from "@/constants/Colors";
+import { Colors } from "@/constants/Colors";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextStyle,
+  View,
+} from "react-native";
 import Animated from "react-native-reanimated";
-import { TimePicker } from "./TimePicker";
 
 interface HabitTemplate {
   id: string;
@@ -553,13 +559,95 @@ export const HabitCreationBottomSheet: React.FC<
   const [selectedTemplate, setSelectedTemplate] =
     useState<HabitTemplate | null>(null);
   const [isCustomMode, setIsCustomMode] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Custom habit form state
   const [customHabitName, setCustomHabitName] = useState("");
   const [customHabitDescription, setCustomHabitDescription] = useState("");
   const [customHabitEmoji, setCustomHabitEmoji] = useState("⭐");
   const [customHabitTime, setCustomHabitTime] = useState("09:00");
+
+  // Time validation and formatting
+  const formatTime = (input: string): string => {
+    // Remove all non-digit characters
+    const digits = input.replace(/\D/g, "");
+
+    if (digits.length === 0) return "";
+    if (digits.length === 1) return digits;
+    if (digits.length === 2) return digits;
+    if (digits.length === 3) {
+      const hours = digits.slice(0, 1);
+      const minutes = digits.slice(1, 3);
+      return `${hours}:${minutes}`;
+    }
+    if (digits.length >= 4) {
+      const hours = digits.slice(0, 2);
+      const minutes = digits.slice(2, 4);
+      return `${hours}:${minutes}`;
+    }
+    return digits;
+  };
+
+  const validateAndFormatTime = (timeString: string): string => {
+    // If empty, return default
+    if (!timeString.trim()) return "09:00";
+
+    // Remove spaces and convert to uppercase for AM/PM handling
+    let cleaned = timeString.trim().toUpperCase();
+
+    // Handle AM/PM format
+    const hasAMPM = cleaned.includes("AM") || cleaned.includes("PM");
+    const isPM = cleaned.includes("PM");
+    cleaned = cleaned.replace(/[AP]M/g, "").trim();
+
+    // Try to parse the time
+    let hours: number, minutes: number;
+
+    if (cleaned.includes(":")) {
+      const parts = cleaned.split(":");
+      hours = parseInt(parts[0]) || 0;
+      minutes = parseInt(parts[1]) || 0;
+    } else {
+      // Handle formats like "930" -> "9:30" or "15" -> "15:00"
+      const digits = cleaned.replace(/\D/g, "");
+      if (digits.length <= 2) {
+        hours = parseInt(digits) || 0;
+        minutes = 0;
+      } else if (digits.length === 3) {
+        hours = parseInt(digits.slice(0, 1)) || 0;
+        minutes = parseInt(digits.slice(1, 3)) || 0;
+      } else {
+        hours = parseInt(digits.slice(0, 2)) || 0;
+        minutes = parseInt(digits.slice(2, 4)) || 0;
+      }
+    }
+
+    // Handle AM/PM conversion
+    if (hasAMPM) {
+      if (isPM && hours < 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+    }
+
+    // Validate and clamp values
+    hours = Math.max(0, Math.min(23, hours));
+    minutes = Math.max(0, Math.min(59, minutes));
+
+    // Format as HH:MM
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
+  };
+
+  const handleTimeChange = (text: string) => {
+    // Allow user to type freely, format on the fly for better UX
+    const formatted = formatTime(text);
+    setCustomHabitTime(formatted);
+  };
+
+  const handleTimeBlur = () => {
+    // Validate and format when user finishes editing
+    const validated = validateAndFormatTime(customHabitTime);
+    setCustomHabitTime(validated);
+  };
 
   // Snap points for the bottom sheet
   const snapPoints = useMemo(() => {
@@ -781,14 +869,21 @@ export const HabitCreationBottomSheet: React.FC<
 
                     <View style={[styles.formField, { flex: 2 }]}>
                       <Text style={styles.fieldLabel}>Time</Text>
-                      <Pressable
-                        style={styles.timeButton}
-                        onPress={() => setShowTimePicker(true)}
-                      >
-                        <Text style={styles.timeButtonText}>
-                          {customHabitTime}
-                        </Text>
-                      </Pressable>
+                      <TextInput
+                        style={styles.timeInput}
+                        value={customHabitTime}
+                        onChangeText={handleTimeChange}
+                        onBlur={handleTimeBlur}
+                        placeholder="09:00"
+                        placeholderTextColor={Colors.dark.textMuted}
+                        keyboardType="numeric"
+                        maxLength={5}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                      />
+                      <Text style={styles.timeHint}>
+                        Format: HH:MM (24h) or use AM/PM
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -826,14 +921,6 @@ export const HabitCreationBottomSheet: React.FC<
           )}
         </BottomSheetScrollView>
       </BottomSheet>
-
-      {/* Time Picker Modal */}
-      <TimePicker
-        visible={showTimePicker}
-        initialTime={customHabitTime}
-        onTimeSelect={setCustomHabitTime}
-        onClose={() => setShowTimePicker(false)}
-      />
     </>
   );
 };
@@ -882,7 +969,11 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     justifyContent: "center",
-    ...clayStyles.button,
+    shadowColor: Colors.dark.clay.shadow,
+    shadowOffset: { width: -4, height: -4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
   },
   categoryEmoji: {
     fontSize: 24,
@@ -986,19 +1077,21 @@ const styles = StyleSheet.create({
     borderColor: Colors.dark.clay.border,
     textAlign: "center",
   },
-  timeButton: {
+  timeInput: {
     backgroundColor: Colors.dark.background2,
     borderRadius: 12,
     padding: 12,
+    fontSize: 16,
+    color: Colors.dark.textPrimary,
     borderWidth: 1,
     borderColor: Colors.dark.clay.border,
-    alignItems: "center",
-  },
-  timeButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.dark.textPrimary,
-  },
+  } as TextStyle,
+  timeHint: {
+    fontSize: 12,
+    color: Colors.dark.textMuted,
+    textAlign: "right",
+    marginTop: 4,
+  } as TextStyle,
   actionButtons: {
     flexDirection: "row",
     gap: 12,
@@ -1010,7 +1103,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",
-    ...clayStyles.button,
+    shadowColor: Colors.dark.clay.shadow,
+    shadowOffset: { width: -4, height: -4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
   },
   backButton: {
     backgroundColor: Colors.dark.clay.background,
