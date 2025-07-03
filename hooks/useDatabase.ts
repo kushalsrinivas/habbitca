@@ -213,6 +213,21 @@ export const useDatabase = () => {
     }
   };
 
+  const updateHabit = async (habitId: number, habit: Omit<Habit, 'id' | 'created_at' | 'is_active'>) => {
+    try {
+      await db.runAsync(
+        'UPDATE habits SET title = ?, description = ?, emoji = ?, category = ?, frequency = ?, time = ? WHERE id = ?',
+        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time, habitId]
+      );
+      
+      // Emit event to notify all screens of data change
+      dbEventEmitter.emit('habitDataChanged');
+    } catch (error) {
+      console.error('Error updating habit:', error);
+      throw error;
+    }
+  };
+
   const deleteHabit = async (habitId: number) => {
     try {
       await db.runAsync('UPDATE habits SET is_active = 0 WHERE id = ?', [habitId]);
@@ -813,6 +828,7 @@ export const useDatabase = () => {
   return {
     initializeDatabase,
     addHabit,
+    updateHabit,
     getHabits,
     deleteHabit,
     completeHabit,

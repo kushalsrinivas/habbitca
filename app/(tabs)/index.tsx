@@ -22,6 +22,7 @@ import Animated, {
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HabitCreationBottomSheet } from "@/components/ui/HabitCreationBottomSheet";
+import { HabitEditBottomSheet } from "@/components/ui/HabitEditBottomSheet";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
 import {
@@ -44,6 +45,7 @@ interface HabitStats {
 interface HabitSectionProps {
   stats: HabitStats;
   onToggle: () => void;
+  onEdit: () => void;
   getStreakColor: (streak: number) => string;
   getAchievementBadges: (
     stats: HabitStats
@@ -53,6 +55,7 @@ interface HabitSectionProps {
 const HabitSection: React.FC<HabitSectionProps> = ({
   stats,
   onToggle,
+  onEdit,
   getStreakColor,
   getAchievementBadges,
 }) => {
@@ -110,22 +113,38 @@ const HabitSection: React.FC<HabitSectionProps> = ({
           </View>
         </View>
 
-        <Pressable onPress={onToggle} style={styles.checkButton}>
-          <View
-            style={[
-              styles.checkCircle,
-              stats.isCompletedToday && styles.checkCircleCompleted,
-            ]}
+        <View style={styles.habitActions}>
+          <Pressable
+            onPress={() => {
+              console.log("Edit button pressed for habit:", stats.habit.title);
+              onEdit();
+            }}
+            style={styles.actionButton}
           >
-            <Animated.View style={checkAnimatedStyle}>
-              <Ionicons
-                name="checkmark"
-                size={20}
-                color={Colors.dark.textPrimary}
-              />
-            </Animated.View>
-          </View>
-        </Pressable>
+            <Ionicons
+              name="pencil"
+              size={18}
+              color={Colors.dark.textSecondary}
+            />
+          </Pressable>
+
+          <Pressable onPress={onToggle} style={styles.checkButton}>
+            <View
+              style={[
+                styles.checkCircle,
+                stats.isCompletedToday && styles.checkCircleCompleted,
+              ]}
+            >
+              <Animated.View style={checkAnimatedStyle}>
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors.dark.textPrimary}
+                />
+              </Animated.View>
+            </View>
+          </Pressable>
+        </View>
       </View>
 
       {/* Stats Row */}
@@ -209,6 +228,8 @@ export default function HabitsScreen() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isAddHabitVisible, setIsAddHabitVisible] = useState(false);
+  const [isEditHabitVisible, setIsEditHabitVisible] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
 
   const db = useDatabase();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -438,6 +459,69 @@ export default function HabitsScreen() {
     }
   };
 
+  const handleEditHabit = (habit: Habit) => {
+    console.log("handleEditHabit called with habit:", habit);
+    setEditingHabit(habit);
+    setIsEditHabitVisible(true);
+    console.log("Edit modal state set to visible");
+  };
+
+  const handleDeleteHabit = async (habitId: number) => {
+    if (!editingHabit) return;
+    
+    try {
+      await db.deleteHabit(habitId);
+      await loadData();
+      
+      // Close the edit modal
+      setIsEditHabitVisible(false);
+      setEditingHabit(null);
+      
+      Alert.alert("Success", "Habit deleted successfully");
+    } catch (error) {
+      console.error("Error deleting habit:", error);
+      Alert.alert("Error", "Failed to delete habit. Please try again.");
+    }
+  };
+
+  const handleUpdateHabit = async (habitData: {
+    title: string;
+    description: string;
+    emoji: string;
+    category: string;
+    time: string;
+  }) => {
+    if (!editingHabit) return;
+
+    try {
+      await db.updateHabit(editingHabit.id, {
+        title: habitData.title,
+        description: habitData.description,
+        emoji: habitData.emoji,
+        category: habitData.category,
+        frequency: "daily",
+        time: habitData.time,
+      });
+
+      // Reload data to show the updated habit
+      await loadData();
+
+      // Close the bottom sheet
+      setIsEditHabitVisible(false);
+      setEditingHabit(null);
+
+      // Show success message
+      Alert.alert(
+        "Success! ✨",
+        `Your habit '${habitData.title}' has been updated!`,
+        [{ text: "OK", style: "default" }]
+      );
+    } catch (error) {
+      console.error("Error updating habit:", error);
+      Alert.alert("Error", "Failed to update habit. Please try again.");
+    }
+  };
+
   const getXPProgress = () => {
     if (!userStats) return { current: 0, needed: 100, percentage: 0 };
     return db.getXPProgress(userStats.xp, userStats.level);
@@ -528,6 +612,7 @@ export default function HabitsScreen() {
                 key={stats.habit.id}
                 stats={stats}
                 onToggle={() => handleToggleHabit(stats.habit.id)}
+                onEdit={() => handleEditHabit(stats.habit)}
                 getStreakColor={getStreakColor}
                 getAchievementBadges={getAchievementBadges}
               />
@@ -541,6 +626,18 @@ export default function HabitsScreen() {
         visible={isAddHabitVisible}
         onClose={() => setIsAddHabitVisible(false)}
         onCreateHabit={handleCreateHabit}
+      />
+
+      {/* Habit Edit Bottom Sheet */}
+      <HabitEditBottomSheet
+        visible={isEditHabitVisible}
+        habit={editingHabit}
+        onClose={() => {
+          setIsEditHabitVisible(false);
+          setEditingHabit(null);
+        }}
+        onUpdateHabit={handleUpdateHabit}
+        onDeleteHabit={handleDeleteHabit}
       />
     </SafeAreaView>
   );
@@ -697,6 +794,22 @@ const styles = StyleSheet.create({
   checkCircleCompleted: {
     backgroundColor: Colors.dark.success,
     borderColor: Colors.dark.success,
+  },
+  habitActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.dark.clay.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
   miniCalendarSection: {
     marginBottom: 16,
