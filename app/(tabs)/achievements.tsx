@@ -37,6 +37,8 @@ export default function AchievementsScreen() {
     setRefreshing(false);
   };
 
+
+
   useFocusEffect(
     useCallback(() => {
       loadAchievements();
@@ -90,7 +92,11 @@ export default function AchievementsScreen() {
         progressText = `Reach level ${value}`;
         break;
       case "streak":
+      case "streak_start":
         progressText = `${value}-day streak`;
+        break;
+      case "mega_streak":
+        progressText = `${value}-day mega streak`;
         break;
       case "habits_completed":
         progressText =
@@ -98,11 +104,66 @@ export default function AchievementsScreen() {
             ? `Complete ${value} habits total`
             : `Complete ${value} habits`;
         break;
+      case "habits_per_day":
+        progressText = `Complete ${value} habits in one day`;
+        break;
+      case "total_habits_created":
+        progressText = `Create ${value} total habits`;
+        break;
       case "consistency":
+      case "monthly_perfect":
         progressText = `${value}% consistency ${timeframe || ""}`;
         break;
       case "total_xp":
         progressText = `Earn ${value} total XP`;
+        break;
+      case "gold_achievements":
+        progressText = `Unlock ${value} gold achievements`;
+        break;
+      case "special_date":
+        progressText = `Log habit on special date`;
+        break;
+      case "social_share":
+        progressText = `Share ${value} milestone`;
+        break;
+      case "habit_notes":
+        progressText = `Log ${value} habit notes`;
+        break;
+      case "streak_recovery":
+        progressText = `Recover streak within ${value} days`;
+        break;
+      case "weekend_complete":
+        progressText = `Complete all weekend habits`;
+        break;
+      case "night_habits":
+        progressText = `Log ${value} habits after 10 PM`;
+        break;
+      case "consistency_period":
+        progressText = `${value}% consistency over 2 weeks`;
+        break;
+      case "active_habits_duration":
+        progressText = `Maintain 3+ habits for ${value} days`;
+        break;
+      case "no_zero_days":
+        progressText = `Complete habits for ${value} days straight`;
+        break;
+      case "time_based_habits":
+        progressText = `Log morning, afternoon & night habits`;
+        break;
+      case "streak_comeback":
+        progressText = `Build longer streak after break`;
+        break;
+      case "zen_mode":
+        progressText = `Perfect completion for ${value} days`;
+        break;
+      case "habit_edits":
+        progressText = `Edit ${value} different habits`;
+        break;
+      case "habit_revival":
+        progressText = `Revive habit after ${value}+ days`;
+        break;
+      default:
+        progressText = `Achievement requirement: ${value}`;
         break;
     }
 
@@ -126,6 +187,8 @@ export default function AchievementsScreen() {
           <Text style={styles.subtitle}>
             Your habit-building journey milestones
           </Text>
+
+          
         </View>
 
         {/* Stats Overview */}
@@ -433,4 +496,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+
 });

@@ -26,6 +26,7 @@ import Animated, {
 import { ClayButton } from "@/components/ui/ClayButton";
 import { Colors, glassStyles } from "@/constants/Colors";
 import type { Achievement, LevelUpData } from "@/hooks/useDatabase";
+import { useDatabase } from "@/hooks/useDatabase";
 
 const { width, height } = Dimensions.get("window");
 
@@ -120,6 +121,7 @@ const Particle: React.FC<ParticleProps> = ({ index, type }) => {
 export default function CelebrationScreen() {
   const params = useLocalSearchParams();
   const [showSharePreview, setShowSharePreview] = useState(false);
+  const db = useDatabase();
 
   // Parse the achievement or level data from params
   const achievement: Achievement | null = params.achievement
@@ -255,6 +257,9 @@ export default function CelebrationScreen() {
         message,
         title: isLevelUp ? "Level Up!" : "Achievement Unlocked!",
       });
+
+      // Trigger social share achievement
+      await db.triggerSocialShare();
     } catch (error) {
       console.error("Error sharing:", error);
     }

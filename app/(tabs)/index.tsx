@@ -371,13 +371,19 @@ export default function HabitsScreen() {
 
         // Check for new achievements (this might also trigger the modal)
         const newAchievements = await db.checkAndUnlockAchievements();
+        console.log('🎉 New achievements unlocked:', newAchievements);
+        
         if (newAchievements.length > 0 && !result.levelUpData) {
           // Only show achievement modal if no level-up occurred
           const achievements = await db.getAllAchievements();
           const firstNewAchievement = achievements.find(
             (a) => newAchievements.includes(a.id) && a.is_unlocked
           );
+          
+          console.log('🏆 First new achievement to show:', firstNewAchievement);
+          
           if (firstNewAchievement) {
+            console.log('🎊 Navigating to celebration screen for achievement:', firstNewAchievement.title);
             router.push({
               pathname: "/celebration",
               params: {

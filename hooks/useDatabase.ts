@@ -63,9 +63,9 @@ export interface Achievement {
   icon: string;
   type: 'bronze' | 'silver' | 'gold' | 'platinum';
   requirement: {
-    type: 'streak' | 'habits_completed' | 'level' | 'consistency' | 'total_xp';
+    type: 'streak' | 'habits_completed' | 'level' | 'consistency' | 'total_xp' | 'habits_per_day' | 'streak_start' | 'total_habits_created' | 'habit_notes' | 'streak_recovery' | 'weekend_complete' | 'night_habits' | 'consistency_period' | 'active_habits_duration' | 'no_zero_days' | 'time_based_habits' | 'gold_achievements' | 'monthly_perfect' | 'streak_comeback' | 'mega_streak' | 'zen_mode' | 'habit_edits' | 'habit_revival' | 'social_share' | 'special_date' | 'weather_based';
     value: number;
-    timeframe?: 'day' | 'week' | 'month' | 'all_time';
+    timeframe?: 'day' | 'week' | 'month' | 'all_time' | 'weekend' | 'period';
   };
   xp_reward: number;
   unlocked_at?: string;
@@ -320,14 +320,27 @@ export const useDatabase = () => {
         [habitId]
       ) as { date: string; completed: number }[];
 
+      if (logs.length === 0) return 0;
+
       let streak = 0;
       const today = new Date(currentDate);
       
+      // Start from the most recent log and work backwards
       for (let i = 0; i < logs.length; i++) {
         const logDate = new Date(logs[i].date);
         const daysDiff = Math.floor((today.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24));
         
+        // For the first log, it should be either today or yesterday (if we're checking for ongoing streak)
+        if (i === 0 && daysDiff > 1) {
+          // If the most recent completion is more than 1 day ago, streak is broken
+          break;
+        }
+        
+        // Check if this log is consecutive with the previous one
         if (daysDiff === streak) {
+          streak++;
+        } else if (daysDiff === streak + 1 && i === 0) {
+          // Special case: if it's the first log and it's from yesterday, count it
           streak++;
         } else {
           break;
@@ -469,6 +482,7 @@ export const useDatabase = () => {
   const initializeDefaultAchievements = async () => {
     try {
       const defaultAchievements = [
+        // 🥉 Bronze Tier – Early Engagement (50–100 XP)
         {
           id: 'first_habit',
           title: 'First Steps',
@@ -481,6 +495,61 @@ export const useDatabase = () => {
           xp_reward: 50
         },
         {
+          id: 'double_up',
+          title: 'Double Up',
+          description: 'Complete 2 habits in a single day',
+          icon: '⚡',
+          type: 'bronze',
+          requirement_type: 'habits_per_day',
+          requirement_value: 2,
+          requirement_timeframe: 'day',
+          xp_reward: 50
+        },
+        {
+          id: 'streak_starter',
+          title: 'Streak Starter',
+          description: 'Start a streak of 3 days',
+          icon: '🔥',
+          type: 'bronze',
+          requirement_type: 'streak_start',
+          requirement_value: 3,
+          requirement_timeframe: null,
+          xp_reward: 50
+        },
+        {
+          id: 'the_explorer',
+          title: 'The Explorer',
+          description: 'Add 5 different habits',
+          icon: '🗺️',
+          type: 'bronze',
+          requirement_type: 'total_habits_created',
+          requirement_value: 5,
+          requirement_timeframe: null,
+          xp_reward: 75
+        },
+        {
+          id: 'reflection_rookie',
+          title: 'Reflection Rookie',
+          description: 'Log a habit note/journal entry 5 times',
+          icon: '📝',
+          type: 'bronze',
+          requirement_type: 'habit_notes',
+          requirement_value: 5,
+          requirement_timeframe: null,
+          xp_reward: 75
+        },
+        {
+          id: 'quick_recovery',
+          title: 'Quick Recovery',
+          description: 'Resume a streak within 2 days of breaking it',
+          icon: '🏃‍♂️',
+          type: 'bronze',
+          requirement_type: 'streak_recovery',
+          requirement_value: 2,
+          requirement_timeframe: null,
+          xp_reward: 100
+        },
+        {
           id: 'week_warrior',
           title: 'Week Warrior',
           description: 'Maintain a 7-day streak',
@@ -491,27 +560,62 @@ export const useDatabase = () => {
           requirement_timeframe: null,
           xp_reward: 100
         },
+
+        // 🥈 Silver Tier – Building Momentum (150–200 XP)
         {
-          id: 'habit_master',
-          title: 'Habit Master',
-          description: 'Complete 30 habits total',
-          icon: '👑',
+          id: 'habit_architect',
+          title: 'Habit Architect',
+          description: 'Create 10 total habits',
+          icon: '🏗️',
           type: 'silver',
-          requirement_type: 'habits_completed',
-          requirement_value: 30,
-          requirement_timeframe: 'all_time',
-          xp_reward: 200
+          requirement_type: 'total_habits_created',
+          requirement_value: 10,
+          requirement_timeframe: null,
+          xp_reward: 150
         },
         {
-          id: 'consistency_king',
-          title: 'Consistency King',
-          description: 'Achieve 90% consistency this month',
-          icon: '⚡',
-          type: 'gold',
-          requirement_type: 'consistency',
-          requirement_value: 90,
-          requirement_timeframe: 'month',
-          xp_reward: 300
+          id: 'weekend_warrior',
+          title: 'Weekend Warrior',
+          description: 'Complete all habits for a weekend (Saturday + Sunday)',
+          icon: '🏖️',
+          type: 'silver',
+          requirement_type: 'weekend_complete',
+          requirement_value: 1,
+          requirement_timeframe: 'weekend',
+          xp_reward: 150
+        },
+        {
+          id: 'night_owl',
+          title: 'Night Owl',
+          description: 'Log a habit after 10 PM 7 times',
+          icon: '🦉',
+          type: 'silver',
+          requirement_type: 'night_habits',
+          requirement_value: 7,
+          requirement_timeframe: null,
+          xp_reward: 150
+        },
+        {
+          id: 'consistency_climber',
+          title: 'Consistency Climber',
+          description: 'Achieve 75% consistency over any 2 weeks',
+          icon: '🧗‍♂️',
+          type: 'silver',
+          requirement_type: 'consistency_period',
+          requirement_value: 75,
+          requirement_timeframe: 'period',
+          xp_reward: 175
+        },
+        {
+          id: 'routine_builder',
+          title: 'Routine Builder',
+          description: 'Maintain 3 active habits for 21 straight days',
+          icon: '🏗️',
+          type: 'silver',
+          requirement_type: 'active_habits_duration',
+          requirement_value: 21,
+          requirement_timeframe: null,
+          xp_reward: 200
         },
         {
           id: 'level_five',
@@ -523,6 +627,63 @@ export const useDatabase = () => {
           requirement_value: 5,
           requirement_timeframe: null,
           xp_reward: 150
+        },
+
+        // 🥇 Gold Tier – Advanced Consistency (250–500 XP)
+        {
+          id: 'no_zero_days',
+          title: 'No Zero Days',
+          description: 'Do something every day for a full month',
+          icon: '📅',
+          type: 'gold',
+          requirement_type: 'no_zero_days',
+          requirement_value: 30,
+          requirement_timeframe: 'month',
+          xp_reward: 300
+        },
+        {
+          id: 'all_rounder',
+          title: 'All Rounder',
+          description: 'Log morning, afternoon, and night habits on the same day',
+          icon: '🌅',
+          type: 'gold',
+          requirement_type: 'time_based_habits',
+          requirement_value: 3,
+          requirement_timeframe: 'day',
+          xp_reward: 250
+        },
+        {
+          id: 'wall_of_fame',
+          title: 'Wall of Fame',
+          description: 'Achieve 3 Gold-tier achievements',
+          icon: '🏆',
+          type: 'gold',
+          requirement_type: 'gold_achievements',
+          requirement_value: 3,
+          requirement_timeframe: null,
+          xp_reward: 300
+        },
+        {
+          id: 'monthly_mastery',
+          title: 'Monthly Mastery',
+          description: '100% consistency for one full month',
+          icon: '💯',
+          type: 'gold',
+          requirement_type: 'monthly_perfect',
+          requirement_value: 100,
+          requirement_timeframe: 'month',
+          xp_reward: 500
+        },
+        {
+          id: 'bounced_back',
+          title: 'Bounced Back',
+          description: 'Recover from a streak break and go on to build a longer one',
+          icon: '🔄',
+          type: 'gold',
+          requirement_type: 'streak_comeback',
+          requirement_value: 1,
+          requirement_timeframe: null,
+          xp_reward: 300
         },
         {
           id: 'level_ten',
@@ -546,16 +707,97 @@ export const useDatabase = () => {
           requirement_timeframe: null,
           xp_reward: 500
         },
+
+        // 💎 Platinum Tier – Elite Users (500+ XP)
         {
-          id: 'xp_collector',
-          title: 'XP Collector',
-          description: 'Earn 1000 total XP',
+          id: 'the_relentless',
+          title: 'The Relentless',
+          description: 'Maintain a 100-day streak',
+          icon: '🔥',
+          type: 'platinum',
+          requirement_type: 'mega_streak',
+          requirement_value: 100,
+          requirement_timeframe: null,
+          xp_reward: 750
+        },
+        {
+          id: 'xp_beast',
+          title: 'XP Beast',
+          description: 'Cross 5000 XP total',
           icon: '💎',
           type: 'platinum',
           requirement_type: 'total_xp',
+          requirement_value: 5000,
+          requirement_timeframe: null,
+          xp_reward: 500
+        },
+        {
+          id: 'zen_mode',
+          title: 'Zen Mode',
+          description: 'Complete all habits for 14 days without missing a single one',
+          icon: '🧘',
+          type: 'platinum',
+          requirement_type: 'zen_mode',
+          requirement_value: 14,
+          requirement_timeframe: null,
+          xp_reward: 600
+        },
+        {
+          id: 'lifetime_loyalist',
+          title: 'Lifetime Loyalist',
+          description: 'Complete 1000 habits total',
+          icon: '👑',
+          type: 'platinum',
+          requirement_type: 'habits_completed',
           requirement_value: 1000,
+          requirement_timeframe: 'all_time',
+          xp_reward: 1000
+        },
+
+        // 🌟 Bonus Achievements (Hidden/Fun)
+        {
+          id: 'new_year_new_me',
+          title: 'New Year, New Me',
+          description: 'Log a habit on Jan 1st',
+          icon: '🎊',
+          type: 'bronze',
+          requirement_type: 'special_date',
+          requirement_value: 1,
+          requirement_timeframe: null,
+          xp_reward: 50
+        },
+        {
+          id: 'habit_hacker',
+          title: 'Habit Hacker',
+          description: 'Edit and optimize 10 different habits over time',
+          icon: '🔧',
+          type: 'silver',
+          requirement_type: 'habit_edits',
+          requirement_value: 10,
+          requirement_timeframe: null,
+          xp_reward: 150
+        },
+        {
+          id: 'ghostbuster',
+          title: 'Ghostbuster',
+          description: 'Revive an old habit you abandoned over 30 days ago',
+          icon: '👻',
+          type: 'silver',
+          requirement_type: 'habit_revival',
+          requirement_value: 30,
           requirement_timeframe: null,
           xp_reward: 200
+        },
+        {
+          id: 'social_spark',
+          title: 'Social Spark',
+          description: 'Share a milestone with a friend or on social media',
+          icon: '📱',
+          type: 'bronze',
+          requirement_type: 'social_share',
+          requirement_value: 1,
+          requirement_timeframe: null,
+          xp_reward: 75
         }
       ];
 
@@ -671,13 +913,21 @@ export const useDatabase = () => {
 
   const checkAndUnlockAchievements = async () => {
     try {
+      console.log('🏆 Checking achievements...');
       const [userStats, habits, achievements] = await Promise.all([
         getUserStats(),
         getHabits(),
         getAllAchievements()
       ]);
 
-      if (!userStats) return [];
+      if (!userStats) {
+        console.log('❌ No user stats found');
+        return [];
+      }
+
+      console.log('📊 User stats:', { level: userStats.level, xp: userStats.xp });
+      console.log('🎯 Total achievements:', achievements.length);
+      console.log('✅ Unlocked achievements:', achievements.filter(a => a.is_unlocked).length);
 
       const unlockedAchievements: string[] = [];
 
@@ -685,25 +935,33 @@ export const useDatabase = () => {
         if (achievement.is_unlocked) continue;
 
         let shouldUnlock = false;
+        let debugInfo = '';
 
         switch (achievement.requirement.type) {
           case 'level':
             shouldUnlock = userStats.level >= achievement.requirement.value;
+            debugInfo = `Level ${userStats.level} >= ${achievement.requirement.value}`;
             break;
 
           case 'total_xp':
             shouldUnlock = userStats.xp >= achievement.requirement.value;
+            debugInfo = `XP ${userStats.xp} >= ${achievement.requirement.value}`;
             break;
 
           case 'streak':
+          case 'streak_start':
+          case 'mega_streak':
             // Check if any habit has the required streak
+            let maxStreak = 0;
             for (const habit of habits) {
               const streak = await getHabitStreak(habit.id, new Date().toISOString().split('T')[0]);
+              maxStreak = Math.max(maxStreak, streak);
               if (streak >= achievement.requirement.value) {
                 shouldUnlock = true;
                 break;
               }
             }
+            debugInfo = `Max streak ${maxStreak} >= ${achievement.requirement.value}`;
             break;
 
           case 'habits_completed':
@@ -712,6 +970,7 @@ export const useDatabase = () => {
                 'SELECT COUNT(*) as count FROM habit_logs WHERE completed = 1'
               ) as { count: number };
               shouldUnlock = totalCompleted.count >= achievement.requirement.value;
+              debugInfo = `Total completed ${totalCompleted.count} >= ${achievement.requirement.value}`;
             } else {
               // Default to today
               const todayCompleted = await db.getFirstAsync(
@@ -719,10 +978,34 @@ export const useDatabase = () => {
                 [new Date().toISOString().split('T')[0]]
               ) as { count: number };
               shouldUnlock = todayCompleted.count >= achievement.requirement.value;
+              debugInfo = `Today completed ${todayCompleted.count} >= ${achievement.requirement.value}`;
             }
             break;
 
+          case 'habits_per_day':
+            const today = new Date().toISOString().split('T')[0];
+            const todayCompleted = await db.getFirstAsync(
+              'SELECT COUNT(*) as count FROM habit_logs WHERE completed = 1 AND date = ?',
+              [today]
+            ) as { count: number };
+            shouldUnlock = todayCompleted.count >= achievement.requirement.value;
+            debugInfo = `Today completed ${todayCompleted.count} >= ${achievement.requirement.value}`;
+            break;
+
+          case 'total_habits_created':
+            const totalHabits = await db.getFirstAsync(
+              'SELECT COUNT(*) as count FROM habits WHERE is_active = 1'
+            ) as { count: number };
+            const deletedHabits = await db.getFirstAsync(
+              'SELECT COUNT(*) as count FROM habits WHERE is_active = 0'
+            ) as { count: number };
+            const totalCreated = totalHabits.count + deletedHabits.count;
+            shouldUnlock = totalCreated >= achievement.requirement.value;
+            debugInfo = `Total habits created ${totalCreated} >= ${achievement.requirement.value}`;
+            break;
+
           case 'consistency':
+          case 'monthly_perfect':
             if (achievement.requirement.timeframe === 'month') {
               // Calculate this month's consistency
               const now = new Date();
@@ -740,18 +1023,71 @@ export const useDatabase = () => {
               
               const consistency = (completedDays.count / totalDays) * 100;
               shouldUnlock = consistency >= achievement.requirement.value;
+              debugInfo = `Consistency ${consistency.toFixed(1)}% >= ${achievement.requirement.value}%`;
             }
+            break;
+
+          case 'gold_achievements':
+            const goldAchievements = achievements.filter(a => a.type === 'gold' && a.is_unlocked);
+            shouldUnlock = goldAchievements.length >= achievement.requirement.value;
+            debugInfo = `Gold achievements ${goldAchievements.length} >= ${achievement.requirement.value}`;
+            break;
+
+          case 'special_date':
+            // Check if today is January 1st
+            const currentDate = new Date();
+            const isNewYear = currentDate.getMonth() === 0 && currentDate.getDate() === 1;
+            shouldUnlock = isNewYear;
+            debugInfo = `Is New Year's Day: ${isNewYear}`;
+            break;
+
+          case 'social_share':
+            // This would typically be triggered manually when user shares
+            // For now, we'll leave it as false and implement sharing trigger later
+            shouldUnlock = false;
+            debugInfo = `Social share not implemented yet`;
+            break;
+
+          // Placeholder implementations for complex achievements
+          case 'habit_notes':
+          case 'streak_recovery':
+          case 'weekend_complete':
+          case 'night_habits':
+          case 'consistency_period':
+          case 'active_habits_duration':
+          case 'no_zero_days':
+          case 'time_based_habits':
+          case 'streak_comeback':
+          case 'zen_mode':
+          case 'habit_edits':
+          case 'habit_revival':
+          case 'weather_based':
+            // These require more complex tracking that we'll implement later
+            shouldUnlock = false;
+            debugInfo = `Complex achievement - not yet implemented`;
+            break;
+
+          default:
+            shouldUnlock = false;
+            debugInfo = `Unknown achievement type: ${achievement.requirement.type}`;
             break;
         }
 
+        console.log(`🎯 ${achievement.title}: ${debugInfo} = ${shouldUnlock ? '✅' : '❌'}`);
+
         if (shouldUnlock) {
+          console.log(`🎉 Unlocking achievement: ${achievement.title}`);
           const unlocked = await unlockAchievement(achievement.id);
           if (unlocked) {
             unlockedAchievements.push(achievement.id);
+            console.log(`✅ Successfully unlocked: ${achievement.title}`);
+          } else {
+            console.log(`❌ Failed to unlock: ${achievement.title}`);
           }
         }
       }
 
+      console.log('🏆 Achievement check complete. Newly unlocked:', unlockedAchievements);
       return unlockedAchievements;
     } catch (error) {
       console.error('Error checking achievements:', error);
@@ -811,6 +1147,8 @@ export const useDatabase = () => {
     }
   };
 
+
+
   // Get all habit logs for heatmap (optimized for performance)
   const getHabitLogsForHeatmap = async (habitId: number): Promise<HabitLog[]> => {
     try {
@@ -822,6 +1160,27 @@ export const useDatabase = () => {
     } catch (error) {
       console.error('Error fetching habit logs for heatmap:', error);
       return [];
+    }
+  };
+
+  // Trigger social share achievement
+  const triggerSocialShare = async () => {
+    try {
+      // Check if social share achievement exists and is not unlocked
+      const achievements = await getAllAchievements();
+      const socialShareAchievement = achievements.find(a => a.id === 'social_spark' && !a.is_unlocked);
+      
+      if (socialShareAchievement) {
+        const unlocked = await unlockAchievement('social_spark');
+        if (unlocked) {
+          console.log('🎉 Social Spark achievement unlocked!');
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error triggering social share achievement:', error);
+      return false;
     }
   };
 
@@ -847,6 +1206,7 @@ export const useDatabase = () => {
     getAllAchievements,
     unlockAchievement,
     checkAndUnlockAchievements,
+    triggerSocialShare,
     initializeSampleHabits,
     // Event system for real-time updates
     onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),

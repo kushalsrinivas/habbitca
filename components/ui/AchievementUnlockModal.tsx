@@ -24,6 +24,7 @@ import Animated, {
 
 import { Colors } from "@/constants/Colors";
 import type { Achievement, LevelUpData } from "@/hooks/useDatabase";
+import { useDatabase } from "@/hooks/useDatabase";
 import { ClayButton } from "./ClayButton";
 
 const { width, height } = Dimensions.get("window");
@@ -130,6 +131,7 @@ export function AchievementUnlockModal({
   onClose,
 }: CelebrationModalProps) {
   const [showSharePreview, setShowSharePreview] = useState(false);
+  const db = useDatabase();
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
@@ -285,6 +287,9 @@ export function AchievementUnlockModal({
         message,
         title: isLevelUp ? "Level Up!" : "Achievement Unlocked!",
       });
+
+      // Trigger social share achievement
+      await db.triggerSocialShare();
     } catch (error) {
       console.error("Error sharing:", error);
     }
