@@ -223,13 +223,13 @@ export const TimeConsistencyChart: React.FC<TimeConsistencyChartProps> = ({
           <View style={styles.insightsList}>
             {consistencyStats.consistencyPercentage >= 80 && (
               <Text style={styles.insightText}>
-                🎉 Excellent consistency! You're logging time{" "}
+                🎉 Excellent consistency! You&apos;re logging time{" "}
                 {consistencyStats.consistencyPercentage.toFixed(0)}% of days.
               </Text>
             )}
             {consistencyStats.currentStreak >= 7 && (
               <Text style={styles.insightText}>
-                🔥 Great streak! You've been consistent for{" "}
+                🔥 Great streak! You&apos;ve been consistent for{" "}
                 {consistencyStats.currentStreak} days.
               </Text>
             )}

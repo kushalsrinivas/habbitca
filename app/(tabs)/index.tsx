@@ -106,17 +106,24 @@ const HabitSection: React.FC<HabitSectionProps> = ({
       {/* Habit Header */}
       <View style={styles.habitHeader}>
         <View style={styles.habitInfo}>
-          <Text style={styles.habitEmoji}>{stats.habit.emoji}</Text>
+          <Text style={styles.habitEmoji}>{stats.habit.emoji || "📝"}</Text>
           <View style={styles.habitDetails}>
-            <Text style={styles.habitTitle}>{stats.habit.title}</Text>
-            <Text style={styles.habitTime}>⏰ {stats.habit.time}</Text>
+            <Text style={styles.habitTitle}>
+              {stats.habit.title || "Untitled Habit"}
+            </Text>
+            <Text style={styles.habitTime}>
+              ⏰ {stats.habit.time || "No time set"}
+            </Text>
           </View>
         </View>
 
         <View style={styles.habitActions}>
           <Pressable
             onPress={() => {
-              console.log("Edit button pressed for habit:", stats.habit.title);
+              console.log(
+                "Edit button pressed for habit:",
+                stats.habit.title || "Untitled Habit"
+              );
               onEdit();
             }}
             style={styles.actionButton}
@@ -202,7 +209,7 @@ const HabitSection: React.FC<HabitSectionProps> = ({
         <View style={styles.miniCalendar}>
           {miniCalendarDays.map((day) => (
             <View key={day.dateStr} style={styles.miniCalendarDay}>
-              <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+              <Text style={styles.dayLabel}>{day.dayLabel || "D"}</Text>
               <View
                 style={[
                   styles.dayCircle,
@@ -215,7 +222,7 @@ const HabitSection: React.FC<HabitSectionProps> = ({
                     day.isCompleted && styles.dayNumberCompleted,
                   ]}
                 >
-                  {day.dayNumber}
+                  {day.dayNumber || "?"}
                 </Text>
               </View>
             </View>
@@ -478,7 +485,9 @@ export default function HabitsScreen() {
       // Show success message
       Alert.alert(
         "Success! 🎉",
-        `Your habit '${habitData.title}' has been created. Start building your streak!`,
+        `Your habit '${
+          habitData.title || "Untitled Habit"
+        }' has been created. Start building your streak!`,
         [{ text: "OK", style: "default" }]
       );
     } catch (error) {
@@ -543,7 +552,7 @@ export default function HabitsScreen() {
       // Show success message
       Alert.alert(
         "Success! ✨",
-        `Your habit '${habitData.title}' has been updated!`,
+        `Your habit '${habitData.title || "Untitled Habit"}' has been updated!`,
         [{ text: "OK", style: "default" }]
       );
     } catch (error) {

@@ -295,9 +295,11 @@ export default function TimerScreen() {
         {/* Habit Info */}
         <GlassCard style={styles.habitCard}>
           <View style={styles.habitHeader}>
-            <Text style={styles.habitEmoji}>{habit.emoji}</Text>
+            <Text style={styles.habitEmoji}>{habit.emoji || "📝"}</Text>
             <View style={styles.habitInfo}>
-              <Text style={styles.habitTitle}>{habit.title}</Text>
+              <Text style={styles.habitTitle}>
+                {habit.title || "Untitled Habit"}
+              </Text>
               <Text style={styles.habitDescription}>{habit.description}</Text>
             </View>
           </View>
@@ -388,7 +390,8 @@ export default function TimerScreen() {
           <GlassCard style={styles.confirmationModal}>
             <Text style={styles.confirmationTitle}>Session Complete! 🎉</Text>
             <Text style={styles.confirmationText}>
-              You spent {formatTime(finalDuration)} on {habit.title}
+              You spent {formatTime(finalDuration)} on{" "}
+              {habit.title || "this habit"}
             </Text>
 
             <View style={styles.durationEditor}>

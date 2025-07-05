@@ -314,8 +314,8 @@ export default function StatsScreen() {
                 <TimeSpentChart
                   key={habitData.habit.id}
                   habitId={habitData.habit.id}
-                  habitTitle={habitData.habit.title}
-                  habitEmoji={habitData.habit.emoji}
+                  habitTitle={habitData.habit.title || "Untitled Habit"}
+                  habitEmoji={habitData.habit.emoji || "📝"}
                 />
               ))
           )}
@@ -337,13 +337,15 @@ export default function StatsScreen() {
               <GlassCard key={habitData.habit.id} style={styles.habitCard}>
                 {/* Habit Header */}
                 <View style={styles.habitHeader}>
-                  <Text style={styles.habitEmoji}>{habitData.habit.emoji}</Text>
+                  <Text style={styles.habitEmoji}>
+                    {habitData.habit.emoji || "📝"}
+                  </Text>
                   <View style={styles.habitInfo}>
                     <Text style={styles.habitTitle}>
-                      {habitData.habit.title}
+                      {habitData.habit.title || "Untitled Habit"}
                     </Text>
                     <Text style={styles.habitTime}>
-                      ⏰ {habitData.habit.time}
+                      ⏰ {habitData.habit.time || "No time set"}
                     </Text>
                   </View>
                 </View>

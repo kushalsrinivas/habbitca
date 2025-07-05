@@ -99,7 +99,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         <Pressable onPress={onPress} style={styles.content}>
           <View style={styles.header}>
             <View style={styles.habitInfo}>
-              <Text style={styles.title}>{habit.title}</Text>
+              <Text style={styles.title}>
+                {habit.title || "Untitled Habit"}
+              </Text>
               <Text style={styles.description}>{habit.description}</Text>
               <Text style={styles.time}>⏰ {habit.time}</Text>
             </View>

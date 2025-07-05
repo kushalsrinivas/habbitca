@@ -1,7 +1,7 @@
 import { glassStyles } from "@/constants/Colors";
 import { BlurView } from "expo-blur";
-import type React from "react";
-import { StyleSheet, View, type ViewStyle } from "react-native";
+import React from "react";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -29,6 +29,15 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     }
   };
 
+  // Safely render children, wrapping strings in Text components
+  const safeChildren =
+    React.Children.map(children, (child) => {
+      if (typeof child === "string") {
+        return <Text>{child}</Text>;
+      }
+      return child;
+    }) || children;
+
   return (
     <View style={[getVariantStyle(), style]}>
       <BlurView
@@ -39,7 +48,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
           { borderRadius: variant === "card" ? 16 : 0 },
         ]}
       />
-      <View style={styles.content}>{children}</View>
+      <View style={styles.content}>{safeChildren}</View>
     </View>
   );
 };
