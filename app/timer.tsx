@@ -20,6 +20,7 @@ import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/Colors";
 import { type Habit, useDatabase } from "@/hooks/useDatabase";
+import { useTimer } from "@/hooks/useTimer";
 import { useTimerNotifications } from "@/hooks/useTimerNotifications";
 
 export default function TimerScreen() {

@@ -129,13 +129,13 @@ const HabitSection: React.FC<HabitSectionProps> = ({
           </Pressable>
 
           {stats.habit.track_time ? (
-            <Pressable 
+            <Pressable
               onPress={() => {
                 router.push({
                   pathname: "/timer",
                   params: { habitId: stats.habit.id.toString() },
                 });
-              }} 
+              }}
               style={styles.timerButton}
             >
               <Ionicons
@@ -288,8 +288,6 @@ export default function HabitsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      await db.initializeDatabase();
-
       // Initialize sample habits for testing (only if no habits exist)
       await db.initializeSampleHabits();
 

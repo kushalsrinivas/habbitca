@@ -9,6 +9,28 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useDatabase } from "@/hooks/useDatabase";
+import { useEffect } from "react";
+
+// Database initialization component
+function DatabaseInitializer({ children }: { children: React.ReactNode }) {
+  const db = useDatabase();
+
+  useEffect(() => {
+    const initializeDb = async () => {
+      try {
+        await db.initializeDatabase();
+        console.log("Database initialized successfully");
+      } catch (error) {
+        console.error("Failed to initialize database:", error);
+      }
+    };
+
+    initializeDb();
+  }, [db]);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -38,29 +60,31 @@ export default function RootLayout() {
           end={{ x: 1, y: 1 }}
         />
         <SQLiteProvider databaseName="habittracker.db">
-          <ThemeProvider value={DarkTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="celebration"
-                options={{
-                  headerShown: false,
-                  presentation: "fullScreenModal",
-                  animation: "slide_from_bottom",
-                }}
-              />
-              <Stack.Screen
-                name="timer"
-                options={{
-                  headerShown: false,
-                  presentation: "card",
-                  animation: "slide_from_right",
-                }}
-              />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="light" />
-          </ThemeProvider>
+          <DatabaseInitializer>
+            <ThemeProvider value={DarkTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="celebration"
+                  options={{
+                    headerShown: false,
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name="timer"
+                  options={{
+                    headerShown: false,
+                    presentation: "card",
+                    animation: "slide_from_right",
+                  }}
+                />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="light" />
+            </ThemeProvider>
+          </DatabaseInitializer>
         </SQLiteProvider>
       </View>
     </GestureHandlerRootView>

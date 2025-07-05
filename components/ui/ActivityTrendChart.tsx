@@ -29,9 +29,6 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
   const loadData = async (period: TimePeriod) => {
     setLoading(true);
     try {
-      // Ensure database is initialized first
-      await db.initializeDatabase();
-
       let activityData: ActivityDataPoint[] = [];
 
       switch (period) {
@@ -156,7 +153,7 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
     const timer = setTimeout(() => {
       loadData(selectedPeriod);
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [selectedPeriod]);
 
@@ -188,13 +185,17 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
   };
 
   // Transform data for Victory Native
-  const chartData = data.length > 0 ? data.map((point, index) => ({
-    x: index,
-    y: point.value,
-    label: point.label,
-  })) : [{ x: 0, y: 0, label: "No data" }];
+  const chartData =
+    data.length > 0
+      ? data.map((point, index) => ({
+          x: index,
+          y: point.value,
+          label: point.label,
+        }))
+      : [{ x: 0, y: 0, label: "No data" }];
 
-  const maxValue = data.length > 0 ? Math.max(...data.map((d) => d.value), 1) : 1;
+  const maxValue =
+    data.length > 0 ? Math.max(...data.map((d) => d.value), 1) : 1;
   const totalCompleted = data.reduce((sum, point) => sum + point.value, 0);
   const averageCompleted =
     data.length > 0 ? Math.round(totalCompleted / data.length) : 0;
