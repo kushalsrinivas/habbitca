@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { ActivityTrendChart } from "@/components/ui/ActivityTrendChart";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HabitHeatmap } from "@/components/ui/HabitHeatmap";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
@@ -228,6 +229,11 @@ export default function StatsScreen() {
           </View>
         </GlassCard>
 
+        {/* Activity Trend Chart */}
+        <View style={styles.chartSection}>
+          <ActivityTrendChart />
+        </View>
+
         {/* Achievements */}
         <GlassCard style={styles.achievementsCard}>
           <Text style={styles.cardTitle}>Achievements</Text>
@@ -443,6 +449,9 @@ const styles = StyleSheet.create({
   statsCard: {
     margin: 16,
     padding: 20,
+  },
+  chartSection: {
+    marginHorizontal: 16,
   },
   cardTitle: {
     fontSize: 20,

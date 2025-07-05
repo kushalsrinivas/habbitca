@@ -88,6 +88,12 @@ export interface LevelUpData {
   levelRewards: string[];
 }
 
+export interface ActivityDataPoint {
+  date: string;
+  value: number;
+  label: string;
+}
+
 export const useDatabase = () => {
   const db = useSQLiteContext();
 
@@ -315,6 +321,12 @@ export const useDatabase = () => {
 
   const getHabitStreak = async (habitId: number, currentDate: string): Promise<number> => {
     try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for habit streak calculation');
+        return 0;
+      }
+
       const logs = await db.getAllAsync(
         'SELECT date, completed FROM habit_logs WHERE habit_id = ? AND completed = 1 ORDER BY date DESC',
         [habitId]
@@ -1152,6 +1164,12 @@ export const useDatabase = () => {
   // Get all habit logs for heatmap (optimized for performance)
   const getHabitLogsForHeatmap = async (habitId: number): Promise<HabitLog[]> => {
     try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for habit logs heatmap');
+        return [];
+      }
+
       const result = await db.getAllAsync(
         'SELECT * FROM habit_logs WHERE habit_id = ? ORDER BY date',
         [habitId]
@@ -1184,6 +1202,153 @@ export const useDatabase = () => {
     }
   };
 
+  // Activity trend data aggregation functions
+
+  const getWeeklyActivityData = async (weeksCount: number = 12): Promise<ActivityDataPoint[]> => {
+    try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for weekly activity data');
+        return [];
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - (weeksCount * 7));
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          strftime('%Y-%W', date) as week,
+          MIN(date) as date,
+          COUNT(*) as completed_count
+        FROM habit_logs 
+        WHERE completed = 1 
+        AND date BETWEEN ? AND ?
+        GROUP BY strftime('%Y-%W', date)
+        ORDER BY week
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result.map((row: any, index: number) => ({
+        date: row.date,
+        value: row.completed_count,
+        label: `Week ${index + 1}`
+      }));
+    } catch (error) {
+      console.error('Error fetching weekly activity data:', error);
+      return [];
+    }
+  };
+
+  const getMonthlyActivityData = async (monthsCount: number = 12): Promise<ActivityDataPoint[]> => {
+    try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for monthly activity data');
+        return [];
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - monthsCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          strftime('%Y-%m', date) as month,
+          MIN(date) as date,
+          COUNT(*) as completed_count
+        FROM habit_logs 
+        WHERE completed = 1 
+        AND date BETWEEN ? AND ?
+        GROUP BY strftime('%Y-%m', date)
+        ORDER BY month
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result.map((row: any) => {
+        const date = new Date(row.date);
+        return {
+          date: row.date,
+          value: row.completed_count,
+          label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching monthly activity data:', error);
+      return [];
+    }
+  };
+
+  const getYearlyActivityData = async (yearsCount: number = 3): Promise<ActivityDataPoint[]> => {
+    try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for yearly activity data');
+        return [];
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - yearsCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          strftime('%Y', date) as year,
+          MIN(date) as date,
+          COUNT(*) as completed_count
+        FROM habit_logs 
+        WHERE completed = 1 
+        AND date BETWEEN ? AND ?
+        GROUP BY strftime('%Y', date)
+        ORDER BY year
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result.map((row: any) => ({
+        date: row.date,
+        value: row.completed_count,
+        label: row.year
+      }));
+    } catch (error) {
+      console.error('Error fetching yearly activity data:', error);
+      return [];
+    }
+  };
+
+  const getDailyActivityData = async (daysCount: number = 30): Promise<ActivityDataPoint[]> => {
+    try {
+      // Check if database is available
+      if (!db) {
+        console.warn('Database not available for daily activity data');
+        return [];
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          date,
+          COUNT(*) as completed_count
+        FROM habit_logs 
+        WHERE completed = 1 
+        AND date BETWEEN ? AND ?
+        GROUP BY date
+        ORDER BY date
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result.map((row: any) => {
+        const date = new Date(row.date);
+        return {
+          date: row.date,
+          value: row.completed_count,
+          label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching daily activity data:', error);
+      return [];
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -1208,6 +1373,11 @@ export const useDatabase = () => {
     checkAndUnlockAchievements,
     triggerSocialShare,
     initializeSampleHabits,
+    // Activity trend data functions
+    getWeeklyActivityData,
+    getMonthlyActivityData,
+    getYearlyActivityData,
+    getDailyActivityData,
     // Event system for real-time updates
     onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),
     offDataChange: (callback: () => void) => dbEventEmitter.off('habitDataChanged', callback),
