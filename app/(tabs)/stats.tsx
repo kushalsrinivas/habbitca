@@ -13,6 +13,10 @@ import {
 import { ActivityTrendChart } from "@/components/ui/ActivityTrendChart";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HabitHeatmap } from "@/components/ui/HabitHeatmap";
+import { TimeConsistencyChart } from "@/components/ui/TimeConsistencyChart";
+import { TimeDistributionChart } from "@/components/ui/TimeDistributionChart";
+import { TimeSpentChart } from "@/components/ui/TimeSpentChart";
+import { TopTimeHabitsCard } from "@/components/ui/TopTimeHabitsCard";
 import { XPProgressBar } from "@/components/ui/XPProgressBar";
 import { Colors } from "@/constants/Colors";
 import {
@@ -272,6 +276,49 @@ export default function StatsScreen() {
         {/* Activity Trend Chart */}
         <View style={styles.chartSection}>
           <ActivityTrendChart />
+        </View>
+
+        {/* Time Visualization Section */}
+        <View style={styles.timeVisualizationSection}>
+          {/* Top Time Habits */}
+          <TopTimeHabitsCard />
+
+          {/* Time Distribution Chart */}
+          <TimeDistributionChart />
+
+          {/* Time Consistency Chart */}
+          <TimeConsistencyChart />
+        </View>
+
+        {/* Time Spent Per Habit Charts */}
+        <View style={styles.timeSpentSection}>
+          <Text style={styles.sectionTitle}>📈 Time Spent Per Habit</Text>
+          {habitStatsData.filter(
+            (habitData) =>
+              habitData.habit.track_time && habitData.totalTimeSpent > 0
+          ).length === 0 ? (
+            <GlassCard style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No time tracking data yet</Text>
+              <Text style={styles.emptySubtext}>
+                Enable time tracking for your habits to see detailed time
+                charts!
+              </Text>
+            </GlassCard>
+          ) : (
+            habitStatsData
+              .filter(
+                (habitData) =>
+                  habitData.habit.track_time && habitData.totalTimeSpent > 0
+              )
+              .map((habitData) => (
+                <TimeSpentChart
+                  key={habitData.habit.id}
+                  habitId={habitData.habit.id}
+                  habitTitle={habitData.habit.title}
+                  habitEmoji={habitData.habit.emoji}
+                />
+              ))
+          )}
         </View>
 
         {/* Habit Heatmaps */}
@@ -644,5 +691,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.dark.textSecondary,
     textAlign: "center",
+  },
+  timeVisualizationSection: {
+    marginHorizontal: 16,
+  },
+  timeSpentSection: {
+    paddingBottom: 20,
   },
 });

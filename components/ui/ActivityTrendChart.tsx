@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { CartesianChart, Line, useChartPressState } from "victory-native";
+import { CartesianChart, Line } from "victory-native";
 
 type TimePeriod = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -22,7 +22,8 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("weekly");
   const [data, setData] = useState<ActivityDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const { state, isActive } = useChartPressState({ x: 0, y: { value: 0 } });
+  // Disabled interactive tooltips to avoid SharedValue issues
+  // const { state, isActive } = useChartPressState({ x: 0, y: { value: 0 } });
 
   const db = useDatabase();
 
@@ -153,7 +154,7 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
     const timer = setTimeout(() => {
       loadData(selectedPeriod);
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [selectedPeriod]);
 
@@ -188,9 +189,9 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
   const chartData =
     data.length > 0
       ? data.map((point, index) => ({
-    x: index,
-    y: point.value,
-    label: point.label,
+          x: index,
+          y: point.value,
+          label: point.label,
         }))
       : [{ x: 0, y: 0, label: "No data" }];
 
@@ -265,15 +266,14 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
               )}
             </CartesianChart>
 
-            {/* Active point indicator */}
-            {isActive && (
+            {/* Active point indicator - disabled to avoid SharedValue issues */}
+            {/* {isActive && (
               <View style={styles.activePointContainer}>
                 <Text style={styles.activePointText}>
-                  {data[Math.floor(state.x)]?.label}:{" "}
-                  {Math.round(state.y.value)} habits
+                  Active point data
                 </Text>
               </View>
-            )}
+            )} */}
           </View>
         )}
       </View>

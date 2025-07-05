@@ -145,7 +145,7 @@ export const useTimerNotifications = ({
       
       const content = {
         title: isPaused ? `⏸️ ${habitTitle} - Paused` : `⏱️ ${habitTitle} - In Progress`,
-        body: isPaused ? 'Tap to return to session' : `${formatTime(elapsedTime)} • Tap to return to session`,
+        body: 'Tap to return to session',
         data: {
           type: 'timer',
           habitTitle,
@@ -223,15 +223,8 @@ export const useTimerNotifications = ({
       // Show notification immediately when session starts
       showTimerNotification();
       
-      // Update notification every 30 seconds while running
-      if (!isPaused) {
-        updateInterval.current = setInterval(() => {
-          if (permissionsGranted.current && isInitialized.current) {
-            console.log('🔔 Updating notification (interval)');
-            showTimerNotification();
-          }
-        }, 30000);
-      } else if (updateInterval.current) {
+      // No need to update notification periodically since we removed elapsed time
+      if (updateInterval.current) {
         clearInterval(updateInterval.current);
         updateInterval.current = null;
       }

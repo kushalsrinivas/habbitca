@@ -1178,7 +1178,8 @@ export const useDatabase = () => {
           emoji: "🧘",
           category: "Mindfulness & Mental Health",
           frequency: "daily" as const,
-          time: "07:00"
+          time: "07:00",
+          track_time: true
         },
         {
           title: "Read for 30 minutes",
@@ -1186,7 +1187,8 @@ export const useDatabase = () => {
           emoji: "📖",
           category: "Study & Learning",
           frequency: "daily" as const,
-          time: "20:00"
+          time: "20:00",
+          track_time: true
         },
         {
           title: "Exercise",
@@ -1194,7 +1196,8 @@ export const useDatabase = () => {
           emoji: "🏃‍♂️",
           category: "Health & Fitness",
           frequency: "daily" as const,
-          time: "18:00"
+          time: "18:00",
+          track_time: true
         },
         {
           title: "Drink 8 glasses of water",
@@ -1202,7 +1205,8 @@ export const useDatabase = () => {
           emoji: "💧",
           category: "Health & Fitness",
           frequency: "daily" as const,
-          time: "09:00"
+          time: "09:00",
+          track_time: false
         }
       ];
 
@@ -1527,6 +1531,202 @@ export const useDatabase = () => {
     }
   };
 
+  // Time tracking analytics functions
+  const getHabitTimeData = async (habitId: number, daysCount: number = 14): Promise<{ date: string; timeSpent: number }[]> => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          date,
+          time_spent as timeSpent
+        FROM habit_logs 
+        WHERE habit_id = ? 
+        AND date BETWEEN ? AND ?
+        AND time_spent > 0
+        ORDER BY date
+      `, [habitId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result as { date: string; timeSpent: number }[];
+    } catch (error) {
+      console.error('Error fetching habit time data:', error);
+      return [];
+    }
+  };
+
+  const getTimeDistributionData = async (daysCount: number = 7): Promise<{ habitId: number; habitTitle: string; habitEmoji: string; totalTime: number; percentage: number }[]> => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          h.id as habitId,
+          h.title as habitTitle,
+          h.emoji as habitEmoji,
+          SUM(hl.time_spent) as totalTime
+        FROM habit_logs hl
+        JOIN habits h ON hl.habit_id = h.id
+        WHERE hl.date BETWEEN ? AND ?
+        AND hl.time_spent > 0
+        AND h.is_active = 1
+        GROUP BY h.id, h.title, h.emoji
+        ORDER BY totalTime DESC
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      const data = result as { habitId: number; habitTitle: string; habitEmoji: string; totalTime: number }[];
+      const totalTimeAll = data.reduce((sum, item) => sum + item.totalTime, 0);
+
+      return data.map(item => ({
+        ...item,
+        percentage: totalTimeAll > 0 ? (item.totalTime / totalTimeAll) * 100 : 0
+      }));
+    } catch (error) {
+      console.error('Error fetching time distribution data:', error);
+      return [];
+    }
+  };
+
+  const getTopTimeHabits = async (daysCount: number = 7, limit: number = 3): Promise<{ habitId: number; habitTitle: string; habitEmoji: string; totalTime: number; previousTime: number; change: number }[]> => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const previousEndDate = new Date(startDate);
+      const previousStartDate = new Date(startDate);
+      previousStartDate.setDate(previousStartDate.getDate() - daysCount);
+
+      // Get current period data
+      const currentResult = await db.getAllAsync(`
+        SELECT 
+          h.id as habitId,
+          h.title as habitTitle,
+          h.emoji as habitEmoji,
+          SUM(hl.time_spent) as totalTime
+        FROM habit_logs hl
+        JOIN habits h ON hl.habit_id = h.id
+        WHERE hl.date BETWEEN ? AND ?
+        AND hl.time_spent > 0
+        AND h.is_active = 1
+        GROUP BY h.id, h.title, h.emoji
+        ORDER BY totalTime DESC
+        LIMIT ?
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0], limit]);
+
+      // Get previous period data for comparison
+      const previousResult = await db.getAllAsync(`
+        SELECT 
+          h.id as habitId,
+          SUM(hl.time_spent) as totalTime
+        FROM habit_logs hl
+        JOIN habits h ON hl.habit_id = h.id
+        WHERE hl.date BETWEEN ? AND ?
+        AND hl.time_spent > 0
+        AND h.is_active = 1
+        GROUP BY h.id
+      `, [previousStartDate.toISOString().split('T')[0], previousEndDate.toISOString().split('T')[0]]);
+
+      const previousMap = new Map(previousResult.map((item: any) => [item.habitId, item.totalTime]));
+
+      return currentResult.map((item: any) => {
+        const previousTime = previousMap.get(item.habitId) || 0;
+        const change = previousTime > 0 ? ((item.totalTime - previousTime) / previousTime) * 100 : 0;
+        return {
+          ...item,
+          previousTime,
+          change
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching top time habits:', error);
+      return [];
+    }
+  };
+
+  const getDailyTotalTimeData = async (daysCount: number = 30): Promise<{ date: string; totalTime: number }[]> => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          date,
+          SUM(time_spent) as totalTime
+        FROM habit_logs 
+        WHERE date BETWEEN ? AND ?
+        AND time_spent > 0
+        GROUP BY date
+        ORDER BY date
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      return result as { date: string; totalTime: number }[];
+    } catch (error) {
+      console.error('Error fetching daily total time data:', error);
+      return [];
+    }
+  };
+
+  const getTimeConsistencyStats = async (daysCount: number = 30): Promise<{ daysWithTime: number; totalDays: number; consistencyPercentage: number; currentStreak: number }> => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysCount);
+
+      const result = await db.getAllAsync(`
+        SELECT 
+          date,
+          SUM(time_spent) as totalTime
+        FROM habit_logs 
+        WHERE date BETWEEN ? AND ?
+        AND time_spent > 0
+        GROUP BY date
+        HAVING totalTime > 0
+        ORDER BY date DESC
+      `, [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]);
+
+      const daysWithTime = result.length;
+      const totalDays = daysCount;
+      const consistencyPercentage = totalDays > 0 ? (daysWithTime / totalDays) * 100 : 0;
+
+      // Calculate current streak
+      let currentStreak = 0;
+      const today = new Date().toISOString().split('T')[0];
+      const resultDates = result.map((r: any) => r.date);
+      
+      for (let i = 0; i < daysCount; i++) {
+        const checkDate = new Date();
+        checkDate.setDate(checkDate.getDate() - i);
+        const dateStr = checkDate.toISOString().split('T')[0];
+        
+        if (resultDates.includes(dateStr)) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+
+      return {
+        daysWithTime,
+        totalDays,
+        consistencyPercentage,
+        currentStreak
+      };
+    } catch (error) {
+      console.error('Error fetching time consistency stats:', error);
+      return {
+        daysWithTime: 0,
+        totalDays: daysCount,
+        consistencyPercentage: 0,
+        currentStreak: 0
+      };
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -1567,5 +1767,11 @@ export const useDatabase = () => {
     // Event system for real-time updates
     onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),
     offDataChange: (callback: () => void) => dbEventEmitter.off('habitDataChanged', callback),
+    // Time tracking analytics
+    getHabitTimeData,
+    getTimeDistributionData,
+    getTopTimeHabits,
+    getDailyTotalTimeData,
+    getTimeConsistencyStats,
   };
 }; 

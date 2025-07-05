@@ -399,7 +399,7 @@ export default function TimerScreen() {
                 style={styles.durationInput}
                 value={Math.floor(finalDuration / 60).toString()}
                 onChangeText={(text) =>
-                  handleEditDuration((parseInt(text) || 0) * 60)
+                  handleEditDuration(((parseInt(text) || 0) * 60).toString())
                 }
                 keyboardType="numeric"
                 selectTextOnFocus
