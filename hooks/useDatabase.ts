@@ -37,6 +37,7 @@ export interface Habit {
   time: string; // HH:MM format
   created_at: string;
   is_active: boolean;
+  track_time: boolean; // NEW: whether time tracking is enabled for this habit
 }
 
 export interface HabitLog {
@@ -45,6 +46,17 @@ export interface HabitLog {
   date: string; // YYYY-MM-DD format
   completed: boolean;
   xp_earned: number;
+  time_spent: number; // NEW: total seconds spent on this habit for the given date
+}
+
+// NEW: individual timer session records (multiple per day)
+export interface HabitSession {
+  id: number;
+  habit_id: number;
+  date: string; // YYYY-MM-DD
+  start_time: string; // ISO timestamp
+  end_time: string | null;
+  duration: number; // seconds
 }
 
 export interface UserStats {
@@ -110,7 +122,8 @@ export const useDatabase = () => {
           frequency TEXT DEFAULT 'daily',
           time TEXT NOT NULL,
           created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          is_active BOOLEAN DEFAULT 1
+          is_active BOOLEAN DEFAULT 1,
+          track_time BOOLEAN DEFAULT 0
         );
       `);
 
@@ -123,6 +136,27 @@ export const useDatabase = () => {
         ALTER TABLE habits ADD COLUMN category TEXT DEFAULT 'Other / Custom';
       `).catch(() => {}); // Ignore error if column already exists
 
+      await db.execAsync(`
+        ALTER TABLE habits ADD COLUMN track_time BOOLEAN DEFAULT 0;
+      `).catch(() => {}); // Ignore error if column already exists
+
+      await db.execAsync(`
+        ALTER TABLE habit_logs ADD COLUMN time_spent INTEGER DEFAULT 0;
+      `).catch(() => {}); // Ignore error if column already exists
+
+      // Create habit_sessions table for multiple sessions per day
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS habit_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          habit_id INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT,
+          duration INTEGER DEFAULT 0,
+          FOREIGN KEY (habit_id) REFERENCES habits (id)
+        );
+      `);
+
       // Create habit_logs table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS habit_logs (
@@ -131,6 +165,7 @@ export const useDatabase = () => {
           date TEXT NOT NULL,
           completed BOOLEAN DEFAULT 0,
           xp_earned INTEGER DEFAULT 0,
+          time_spent INTEGER DEFAULT 0,
           FOREIGN KEY (habit_id) REFERENCES habits (id),
           UNIQUE(habit_id, date)
         );
@@ -192,11 +227,13 @@ export const useDatabase = () => {
   };
 
   // Habit operations
-  const addHabit = async (habit: Omit<Habit, 'id' | 'created_at' | 'is_active'>) => {
+  type HabitInput = Omit<Habit, 'id' | 'created_at' | 'is_active'> & { track_time?: boolean };
+
+  const addHabit = async (habit: HabitInput) => {
     try {
       const result = await db.runAsync(
-        'INSERT INTO habits (title, description, emoji, category, frequency, time) VALUES (?, ?, ?, ?, ?, ?)',
-        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time]
+        'INSERT INTO habits (title, description, emoji, category, frequency, time, track_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time, habit.track_time ? 1 : 0]
       );
       
       // Emit event to notify all screens of data change
@@ -219,11 +256,11 @@ export const useDatabase = () => {
     }
   };
 
-  const updateHabit = async (habitId: number, habit: Omit<Habit, 'id' | 'created_at' | 'is_active'>) => {
+  const updateHabit = async (habitId: number, habit: HabitInput) => {
     try {
       await db.runAsync(
-        'UPDATE habits SET title = ?, description = ?, emoji = ?, category = ?, frequency = ?, time = ? WHERE id = ?',
-        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time, habitId]
+        'UPDATE habits SET title = ?, description = ?, emoji = ?, category = ?, frequency = ?, time = ?, track_time = ? WHERE id = ?',
+        [habit.title, habit.description, habit.emoji, habit.category, habit.frequency, habit.time, habit.track_time ? 1 : 0, habitId]
       );
       
       // Emit event to notify all screens of data change
@@ -255,10 +292,17 @@ export const useDatabase = () => {
       const streakBonus = Math.floor(streak / 7) * 5; // 5 bonus XP for every 7-day streak
       const xpEarned = baseXP + streakBonus;
 
-      // Insert or update habit log
+      // Preserve any existing time_spent value
+      const existing = await db.getFirstAsync(
+        'SELECT time_spent FROM habit_logs WHERE habit_id = ? AND date = ?',
+        [habitId, date]
+      ) as { time_spent: number } | null;
+
+      const currentTimeSpent = existing?.time_spent ?? 0;
+
       await db.runAsync(
-        'INSERT OR REPLACE INTO habit_logs (habit_id, date, completed, xp_earned) VALUES (?, ?, 1, ?)',
-        [habitId, date, xpEarned]
+        'INSERT OR REPLACE INTO habit_logs (habit_id, date, completed, xp_earned, time_spent) VALUES (?, ?, 1, ?, ?)',
+        [habitId, date, xpEarned, currentTimeSpent]
       );
 
       // Update user stats and check for level up
@@ -1349,6 +1393,117 @@ export const useDatabase = () => {
     }
   };
 
+  // Time tracking session operations
+  const startHabitSession = async (habitId: number): Promise<number> => {
+    try {
+      const startTime = new Date().toISOString();
+      const date = startTime.split('T')[0];
+      const result = await db.runAsync(
+        'INSERT INTO habit_sessions (habit_id, date, start_time) VALUES (?, ?, ?)',
+        [habitId, date, startTime]
+      );
+      return result.lastInsertRowId;
+    } catch (error) {
+      console.error('Error starting habit session:', error);
+      throw error;
+    }
+  };
+
+  const stopHabitSession = async (sessionId: number): Promise<void> => {
+    try {
+      const session = await db.getFirstAsync(
+        'SELECT * FROM habit_sessions WHERE id = ?',
+        [sessionId]
+      ) as { id: number; habit_id: number; start_time: string; end_time: string | null; duration: number } | null;
+
+      if (!session || session.end_time) return;
+
+      const endTime = new Date().toISOString();
+      const duration = Math.floor((new Date(endTime).getTime() - new Date(session.start_time).getTime()) / 1000);
+
+      // Update session record
+      await db.runAsync(
+        'UPDATE habit_sessions SET end_time = ?, duration = ? WHERE id = ?',
+        [endTime, duration, sessionId]
+      );
+
+      const date = session.start_time.split('T')[0];
+
+      const existingLog = await db.getFirstAsync(
+        'SELECT time_spent FROM habit_logs WHERE habit_id = ? AND date = ?',
+        [session.habit_id, date]
+      ) as { time_spent: number } | null;
+
+      const previousTime = existingLog?.time_spent ?? 0;
+      const newTime = previousTime + duration;
+
+      // Upsert habit log with accumulated time
+      await db.runAsync(
+        'INSERT OR REPLACE INTO habit_logs (habit_id, date, completed, xp_earned, time_spent) VALUES (?, ?, 1, ?, ?)',
+        [session.habit_id, date, 0, newTime]
+      );
+
+      // Award XP only once per day (when first session created)
+      if (!existingLog) {
+        await completeHabit(session.habit_id, date);
+      }
+
+      dbEventEmitter.emit('habitDataChanged');
+    } catch (error) {
+      console.error('Error stopping habit session:', error);
+      throw error;
+    }
+  };
+
+  const getActiveSession = async (habitId: number): Promise<HabitSession | null> => {
+    try {
+      const session = await db.getFirstAsync(
+        'SELECT * FROM habit_sessions WHERE habit_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
+        [habitId]
+      ) as HabitSession | null;
+      return session;
+    } catch (error) {
+      console.error('Error getting active session:', error);
+      return null;
+    }
+  };
+
+  const getAllActiveSessions = async (): Promise<HabitSession[]> => {
+    try {
+      const sessions = await db.getAllAsync(
+        'SELECT * FROM habit_sessions WHERE end_time IS NULL ORDER BY start_time DESC'
+      ) as HabitSession[];
+      return sessions;
+    } catch (error) {
+      console.error('Error getting all active sessions:', error);
+      return [];
+    }
+  };
+
+  const pauseHabitSession = async (sessionId: number): Promise<void> => {
+    try {
+      // For now, we'll handle pause/resume in the UI state
+      // This function is here for future implementation if needed
+      console.log('Pause session:', sessionId);
+    } catch (error) {
+      console.error('Error pausing habit session:', error);
+      throw error;
+    }
+  };
+
+  const getHabitSessions = async (habitId: number, startDate: string, endDate: string): Promise<HabitSession[]> => {
+    try {
+      const sessions = await db.getAllAsync(
+        'SELECT * FROM habit_sessions WHERE habit_id = ? AND date BETWEEN ? AND ? ORDER BY start_time DESC',
+        [habitId, startDate, endDate]
+      ) as HabitSession[];
+      return sessions;
+    } catch (error) {
+      console.error('Error getting habit sessions:', error);
+      return [];
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -1378,6 +1533,13 @@ export const useDatabase = () => {
     getMonthlyActivityData,
     getYearlyActivityData,
     getDailyActivityData,
+    // Time tracking helpers
+    startHabitSession,
+    stopHabitSession,
+    getActiveSession,
+    getAllActiveSessions,
+    pauseHabitSession,
+    getHabitSessions,
     // Event system for real-time updates
     onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),
     offDataChange: (callback: () => void) => dbEventEmitter.off('habitDataChanged', callback),

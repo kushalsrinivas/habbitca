@@ -20,6 +20,7 @@ interface HabitTemplate {
   description: string;
   emoji: string;
   defaultTime: string;
+  supportsTimeTracking: boolean;
 }
 
 interface Category {
@@ -38,6 +39,7 @@ interface HabitCreationBottomSheetProps {
     emoji: string;
     category: string;
     time: string;
+    track_time: boolean;
   }) => void;
 }
 
@@ -53,6 +55,7 @@ const CATEGORIES: Category[] = [
         description: "Start your day with exercise",
         emoji: "🏃‍♂️",
         defaultTime: "07:00",
+        supportsTimeTracking: true,
       },
       {
         id: "2",
@@ -60,6 +63,7 @@ const CATEGORIES: Category[] = [
         description: "Strength training at the gym",
         emoji: "💪",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
       {
         id: "3",
@@ -67,6 +71,7 @@ const CATEGORIES: Category[] = [
         description: "Mindful movement and stretching",
         emoji: "🧘‍♀️",
         defaultTime: "06:30",
+        supportsTimeTracking: true,
       },
       {
         id: "4",
@@ -74,6 +79,7 @@ const CATEGORIES: Category[] = [
         description: "Relaxing walk to unwind",
         emoji: "🚶‍♂️",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "5",
@@ -81,6 +87,7 @@ const CATEGORIES: Category[] = [
         description: "Stay hydrated throughout the day",
         emoji: "💧",
         defaultTime: "09:00",
+        supportsTimeTracking: false,
       },
     ],
   },
@@ -95,6 +102,7 @@ const CATEGORIES: Category[] = [
         description: "Daily reading for knowledge",
         emoji: "📖",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
       {
         id: "7",
@@ -102,6 +110,7 @@ const CATEGORIES: Category[] = [
         description: "Learn a new language",
         emoji: "🗣️",
         defaultTime: "08:00",
+        supportsTimeTracking: true,
       },
       {
         id: "8",
@@ -109,6 +118,7 @@ const CATEGORIES: Category[] = [
         description: "Complete course modules",
         emoji: "💻",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "9",
@@ -116,6 +126,7 @@ const CATEGORIES: Category[] = [
         description: "Improve programming skills",
         emoji: "👨‍💻",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "10",
@@ -123,6 +134,7 @@ const CATEGORIES: Category[] = [
         description: "Review and organize notes",
         emoji: "📝",
         defaultTime: "17:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -137,6 +149,7 @@ const CATEGORIES: Category[] = [
         description: "Get to bed early for better rest",
         emoji: "🛌",
         defaultTime: "22:00",
+        supportsTimeTracking: true,
       },
       {
         id: "12",
@@ -144,6 +157,7 @@ const CATEGORIES: Category[] = [
         description: "Gentle stretching after waking",
         emoji: "🤸‍♀️",
         defaultTime: "07:30",
+        supportsTimeTracking: true,
       },
       {
         id: "13",
@@ -151,6 +165,7 @@ const CATEGORIES: Category[] = [
         description: "Digital detox before sleep",
         emoji: "📱",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "14",
@@ -158,6 +173,7 @@ const CATEGORIES: Category[] = [
         description: "Short afternoon rest",
         emoji: "😴",
         defaultTime: "14:00",
+        supportsTimeTracking: true,
       },
       {
         id: "15",
@@ -165,6 +181,7 @@ const CATEGORIES: Category[] = [
         description: "Consistent bedtime routine",
         emoji: "🌙",
         defaultTime: "21:30",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -179,6 +196,7 @@ const CATEGORIES: Category[] = [
         description: "Daily mindfulness practice",
         emoji: "🧘",
         defaultTime: "07:00",
+        supportsTimeTracking: true,
       },
       {
         id: "17",
@@ -186,6 +204,7 @@ const CATEGORIES: Category[] = [
         description: "Write down things you're grateful for",
         emoji: "📔",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "18",
@@ -193,6 +212,7 @@ const CATEGORIES: Category[] = [
         description: "Breathing exercises for calm",
         emoji: "🌬️",
         defaultTime: "12:00",
+        supportsTimeTracking: true,
       },
       {
         id: "19",
@@ -200,6 +220,7 @@ const CATEGORIES: Category[] = [
         description: "Start day with positive thoughts",
         emoji: "💭",
         defaultTime: "06:00",
+        supportsTimeTracking: true,
       },
       {
         id: "20",
@@ -207,6 +228,7 @@ const CATEGORIES: Category[] = [
         description: "Walking meditation practice",
         emoji: "🚶‍♀️",
         defaultTime: "16:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -221,6 +243,7 @@ const CATEGORIES: Category[] = [
         description: "Start day with nutritious meal",
         emoji: "🥗",
         defaultTime: "08:00",
+        supportsTimeTracking: true,
       },
       {
         id: "22",
@@ -228,6 +251,7 @@ const CATEGORIES: Category[] = [
         description: "Prepare healthy meals in advance",
         emoji: "🥘",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
       {
         id: "23",
@@ -235,6 +259,7 @@ const CATEGORIES: Category[] = [
         description: "Daily vitamin supplements",
         emoji: "💊",
         defaultTime: "09:00",
+        supportsTimeTracking: false,
       },
       {
         id: "24",
@@ -242,6 +267,7 @@ const CATEGORIES: Category[] = [
         description: "Avoid processed foods",
         emoji: "🚫",
         defaultTime: "12:00",
+        supportsTimeTracking: false,
       },
       {
         id: "25",
@@ -249,6 +275,7 @@ const CATEGORIES: Category[] = [
         description: "Prepare meals instead of ordering",
         emoji: "👨‍🍳",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -263,6 +290,7 @@ const CATEGORIES: Category[] = [
         description: "Organize next day's tasks",
         emoji: "📅",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
       {
         id: "27",
@@ -270,6 +298,7 @@ const CATEGORIES: Category[] = [
         description: "Focused work without distractions",
         emoji: "🎯",
         defaultTime: "09:00",
+        supportsTimeTracking: true,
       },
       {
         id: "28",
@@ -277,6 +306,7 @@ const CATEGORIES: Category[] = [
         description: "Clear and organize emails",
         emoji: "📧",
         defaultTime: "17:00",
+        supportsTimeTracking: true,
       },
       {
         id: "29",
@@ -284,6 +314,7 @@ const CATEGORIES: Category[] = [
         description: "Learn new professional skills",
         emoji: "📈",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "30",
@@ -291,6 +322,7 @@ const CATEGORIES: Category[] = [
         description: "Connect with professionals",
         emoji: "🤝",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -305,6 +337,7 @@ const CATEGORIES: Category[] = [
         description: "Tidy up living space",
         emoji: "🧽",
         defaultTime: "10:00",
+        supportsTimeTracking: true,
       },
       {
         id: "32",
@@ -312,6 +345,7 @@ const CATEGORIES: Category[] = [
         description: "Keep workspace clean",
         emoji: "🗂️",
         defaultTime: "17:00",
+        supportsTimeTracking: true,
       },
       {
         id: "33",
@@ -319,6 +353,7 @@ const CATEGORIES: Category[] = [
         description: "Wash and fold clothes",
         emoji: "👕",
         defaultTime: "14:00",
+        supportsTimeTracking: true,
       },
       {
         id: "34",
@@ -326,6 +361,7 @@ const CATEGORIES: Category[] = [
         description: "Remove unnecessary items",
         emoji: "📦",
         defaultTime: "15:00",
+        supportsTimeTracking: true,
       },
       {
         id: "35",
@@ -333,6 +369,7 @@ const CATEGORIES: Category[] = [
         description: "Organize important papers",
         emoji: "📄",
         defaultTime: "16:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -347,6 +384,7 @@ const CATEGORIES: Category[] = [
         description: "Connect with your spirituality",
         emoji: "🙏",
         defaultTime: "06:00",
+        supportsTimeTracking: true,
       },
       {
         id: "37",
@@ -354,6 +392,7 @@ const CATEGORIES: Category[] = [
         description: "Think about personal growth",
         emoji: "🪞",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "38",
@@ -361,6 +400,7 @@ const CATEGORIES: Category[] = [
         description: "Study religious texts",
         emoji: "📜",
         defaultTime: "07:00",
+        supportsTimeTracking: true,
       },
       {
         id: "39",
@@ -368,6 +408,7 @@ const CATEGORIES: Category[] = [
         description: "Help others in community",
         emoji: "❤️",
         defaultTime: "14:00",
+        supportsTimeTracking: true,
       },
       {
         id: "40",
@@ -375,6 +416,7 @@ const CATEGORIES: Category[] = [
         description: "Show kindness to others",
         emoji: "🤗",
         defaultTime: "12:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -389,6 +431,7 @@ const CATEGORIES: Category[] = [
         description: "Express creativity through art",
         emoji: "🎨",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "42",
@@ -396,6 +439,7 @@ const CATEGORIES: Category[] = [
         description: "Practice musical instrument",
         emoji: "🎵",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
       {
         id: "43",
@@ -403,6 +447,7 @@ const CATEGORIES: Category[] = [
         description: "Document thoughts and experiences",
         emoji: "✍️",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "44",
@@ -410,6 +455,7 @@ const CATEGORIES: Category[] = [
         description: "Capture moments and practice",
         emoji: "📸",
         defaultTime: "16:00",
+        supportsTimeTracking: true,
       },
       {
         id: "45",
@@ -417,6 +463,7 @@ const CATEGORIES: Category[] = [
         description: "Work on creative projects",
         emoji: "🧵",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -431,6 +478,7 @@ const CATEGORIES: Category[] = [
         description: "Stay connected with loved ones",
         emoji: "📞",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "47",
@@ -438,6 +486,7 @@ const CATEGORIES: Category[] = [
         description: "Reach out to friends",
         emoji: "💬",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
       {
         id: "48",
@@ -445,6 +494,7 @@ const CATEGORIES: Category[] = [
         description: "Quality time with partner",
         emoji: "💕",
         defaultTime: "19:30",
+        supportsTimeTracking: true,
       },
       {
         id: "49",
@@ -452,6 +502,7 @@ const CATEGORIES: Category[] = [
         description: "Engage in group activities",
         emoji: "🎉",
         defaultTime: "15:00",
+        supportsTimeTracking: true,
       },
       {
         id: "50",
@@ -459,6 +510,7 @@ const CATEGORIES: Category[] = [
         description: "Practice being present with others",
         emoji: "👂",
         defaultTime: "12:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -473,6 +525,7 @@ const CATEGORIES: Category[] = [
         description: "Monitor daily spending",
         emoji: "💰",
         defaultTime: "21:00",
+        supportsTimeTracking: true,
       },
       {
         id: "52",
@@ -480,6 +533,7 @@ const CATEGORIES: Category[] = [
         description: "Put aside money for goals",
         emoji: "🏦",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
       {
         id: "53",
@@ -487,6 +541,7 @@ const CATEGORIES: Category[] = [
         description: "Study financial markets",
         emoji: "📊",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "54",
@@ -494,6 +549,7 @@ const CATEGORIES: Category[] = [
         description: "Analyze monthly budget",
         emoji: "📋",
         defaultTime: "18:00",
+        supportsTimeTracking: true,
       },
       {
         id: "55",
@@ -501,6 +557,7 @@ const CATEGORIES: Category[] = [
         description: "Work on additional income",
         emoji: "💼",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -515,6 +572,7 @@ const CATEGORIES: Category[] = [
         description: "Take care of your pets",
         emoji: "🐕",
         defaultTime: "08:00",
+        supportsTimeTracking: true,
       },
       {
         id: "57",
@@ -522,6 +580,7 @@ const CATEGORIES: Category[] = [
         description: "Tend to plants and garden",
         emoji: "🌿",
         defaultTime: "17:00",
+        supportsTimeTracking: true,
       },
       {
         id: "58",
@@ -529,6 +588,7 @@ const CATEGORIES: Category[] = [
         description: "Practice something new",
         emoji: "🎓",
         defaultTime: "19:00",
+        supportsTimeTracking: true,
       },
       {
         id: "59",
@@ -536,6 +596,7 @@ const CATEGORIES: Category[] = [
         description: "Do something nice for others",
         emoji: "🌟",
         defaultTime: "14:00",
+        supportsTimeTracking: true,
       },
       {
         id: "60",
@@ -543,6 +604,7 @@ const CATEGORIES: Category[] = [
         description: "Work on personal goals",
         emoji: "🚀",
         defaultTime: "20:00",
+        supportsTimeTracking: true,
       },
     ],
   },
@@ -567,6 +629,7 @@ export const HabitCreationBottomSheet: React.FC<
   const [customHabitDescription, setCustomHabitDescription] = useState("");
   const [customHabitEmoji, setCustomHabitEmoji] = useState("⭐");
   const [customHabitTime, setCustomHabitTime] = useState("09:00");
+  const [customTrackTime, setCustomTrackTime] = useState(false);
 
   const scrollViewRef = useRef<any>(null);
 
@@ -680,6 +743,7 @@ export const HabitCreationBottomSheet: React.FC<
           setCustomHabitDescription("");
           setCustomHabitEmoji("⭐");
           setCustomHabitTime("09:00");
+          setCustomTrackTime(false);
         }, 300);
       }
     },
@@ -721,6 +785,7 @@ export const HabitCreationBottomSheet: React.FC<
         emoji: customHabitEmoji,
         category: selectedCategory?.name || "Other / Custom",
         time: customHabitTime,
+        track_time: customTrackTime,
       });
     } else if (selectedTemplate && selectedCategory) {
       onCreateHabit({
@@ -729,6 +794,7 @@ export const HabitCreationBottomSheet: React.FC<
         emoji: selectedTemplate.emoji,
         category: selectedCategory.name,
         time: selectedTemplate.defaultTime,
+        track_time: selectedTemplate.supportsTimeTracking,
       });
     }
   };
@@ -905,6 +971,35 @@ export const HabitCreationBottomSheet: React.FC<
                         <Text style={styles.timeHint}>
                           Format: HH:MM (24h) or use AM/PM
                         </Text>
+                      </View>
+                    </View>
+
+                    {/* Time Tracking Switch */}
+                    <View style={styles.formField}>
+                      <View style={styles.switchContainer}>
+                        <View style={styles.switchLabelContainer}>
+                          <Text style={styles.fieldLabel}>
+                            Track time spent
+                          </Text>
+                          <Text style={styles.switchDescription}>
+                            Use a timer to track how long you spend on this
+                            habit
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={[
+                            styles.switchButton,
+                            customTrackTime && styles.switchButtonActive,
+                          ]}
+                          onPress={() => setCustomTrackTime(!customTrackTime)}
+                        >
+                          <View
+                            style={[
+                              styles.switchThumb,
+                              customTrackTime && styles.switchThumbActive,
+                            ]}
+                          />
+                        </Pressable>
                       </View>
                     </View>
                   </View>
@@ -1161,5 +1256,46 @@ const styles = StyleSheet.create({
   },
   createButtonTextDisabled: {
     color: Colors.dark.textMuted,
+  },
+  switchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.dark.background2,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+  },
+  switchLabelContainer: {
+    flex: 1,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: Colors.dark.textMuted,
+    marginTop: 4,
+  },
+  switchButton: {
+    width: 40,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.clay.background,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+  },
+  switchButtonActive: {
+    backgroundColor: Colors.dark.primary,
+    borderColor: Colors.dark.primary,
+  },
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.dark.textPrimary,
+  },
+  switchThumbActive: {
+    backgroundColor: Colors.dark.textPrimary,
   },
 });

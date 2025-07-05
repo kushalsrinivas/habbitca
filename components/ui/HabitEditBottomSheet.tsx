@@ -31,6 +31,7 @@ interface HabitEditBottomSheetProps {
     emoji: string;
     category: string;
     time: string;
+    track_time: boolean;
   }) => void;
   onDeleteHabit: (habitId: number) => void;
 }
@@ -102,6 +103,7 @@ export const HabitEditBottomSheet: React.FC<HabitEditBottomSheetProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   );
+  const [trackTime, setTrackTime] = useState(false);
 
   // Initialize form with existing habit data
   useEffect(() => {
@@ -112,6 +114,7 @@ export const HabitEditBottomSheet: React.FC<HabitEditBottomSheetProps> = ({
       setHabitDescription(habit.description || "");
       setHabitEmoji(habit.emoji || "⭐");
       setHabitTime(habit.time || "09:00");
+      setTrackTime(habit.track_time ?? false);
 
       // Find the matching category
       const category =
@@ -128,6 +131,7 @@ export const HabitEditBottomSheet: React.FC<HabitEditBottomSheetProps> = ({
     setHabitEmoji("⭐");
     setHabitTime("09:00");
     setSelectedCategory(null);
+    setTrackTime(false);
   };
 
   const handleClose = () => {
@@ -156,6 +160,7 @@ export const HabitEditBottomSheet: React.FC<HabitEditBottomSheetProps> = ({
       emoji: habitEmoji,
       category: selectedCategory?.name || "Other / Custom",
       time: habitTime,
+      track_time: trackTime,
     });
 
     handleClose();
@@ -350,6 +355,33 @@ export const HabitEditBottomSheet: React.FC<HabitEditBottomSheetProps> = ({
                     maxLength={5}
                   />
                 </View>
+              </View>
+            </View>
+
+            {/* Time Tracking Switch */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Time Tracking</Text>
+              <View style={styles.switchContainer}>
+                <View style={styles.switchLabelContainer}>
+                  <Text style={styles.switchLabel}>Track time spent</Text>
+                  <Text style={styles.switchDescription}>
+                    Use a timer to track how long you spend on this habit
+                  </Text>
+                </View>
+                <Pressable
+                  style={[
+                    styles.switchButton,
+                    trackTime && styles.switchButtonActive,
+                  ]}
+                  onPress={() => setTrackTime(!trackTime)}
+                >
+                  <View
+                    style={[
+                      styles.switchThumb,
+                      trackTime && styles.switchThumbActive,
+                    ]}
+                  />
+                </Pressable>
               </View>
             </View>
           </View>
@@ -563,5 +595,59 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.dark.clay.border,
     backgroundColor: Colors.dark.background2,
+  },
+  switchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.dark.clay.background,
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  switchLabelContainer: {
+    flex: 1,
+  },
+  switchLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.textPrimary,
+    marginBottom: 4,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+  },
+  switchButton: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.dark.clay.border,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  switchButtonActive: {
+    backgroundColor: Colors.dark.primary,
+    borderColor: Colors.dark.primary,
+  },
+  switchThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.textPrimary,
+  },
+  switchThumbActive: {
+    backgroundColor: Colors.dark.textPrimary,
   },
 });

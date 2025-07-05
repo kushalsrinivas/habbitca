@@ -128,22 +128,41 @@ const HabitSection: React.FC<HabitSectionProps> = ({
             />
           </Pressable>
 
-          <Pressable onPress={onToggle} style={styles.checkButton}>
-            <View
-              style={[
-                styles.checkCircle,
-                stats.isCompletedToday && styles.checkCircleCompleted,
-              ]}
+          {stats.habit.track_time ? (
+            <Pressable 
+              onPress={() => {
+                router.push({
+                  pathname: "/timer",
+                  params: { habitId: stats.habit.id.toString() },
+                });
+              }} 
+              style={styles.timerButton}
             >
-              <Animated.View style={checkAnimatedStyle}>
-                <Ionicons
-                  name="checkmark"
-                  size={20}
-                  color={Colors.dark.textPrimary}
-                />
-              </Animated.View>
-            </View>
-          </Pressable>
+              <Ionicons
+                name="timer-outline"
+                size={20}
+                color={Colors.dark.textPrimary}
+              />
+              <Text style={styles.timerButtonText}>Start Session</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={onToggle} style={styles.checkButton}>
+              <View
+                style={[
+                  styles.checkCircle,
+                  stats.isCompletedToday && styles.checkCircleCompleted,
+                ]}
+              >
+                <Animated.View style={checkAnimatedStyle}>
+                  <Ionicons
+                    name="checkmark"
+                    size={20}
+                    color={Colors.dark.textPrimary}
+                  />
+                </Animated.View>
+              </View>
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -371,19 +390,22 @@ export default function HabitsScreen() {
 
         // Check for new achievements (this might also trigger the modal)
         const newAchievements = await db.checkAndUnlockAchievements();
-        console.log('🎉 New achievements unlocked:', newAchievements);
-        
+        console.log("🎉 New achievements unlocked:", newAchievements);
+
         if (newAchievements.length > 0 && !result.levelUpData) {
           // Only show achievement modal if no level-up occurred
           const achievements = await db.getAllAchievements();
           const firstNewAchievement = achievements.find(
             (a) => newAchievements.includes(a.id) && a.is_unlocked
           );
-          
-          console.log('🏆 First new achievement to show:', firstNewAchievement);
-          
+
+          console.log("🏆 First new achievement to show:", firstNewAchievement);
+
           if (firstNewAchievement) {
-            console.log('🎊 Navigating to celebration screen for achievement:', firstNewAchievement.title);
+            console.log(
+              "🎊 Navigating to celebration screen for achievement:",
+              firstNewAchievement.title
+            );
             router.push({
               pathname: "/celebration",
               params: {
@@ -436,6 +458,7 @@ export default function HabitsScreen() {
     emoji: string;
     category: string;
     time: string;
+    track_time: boolean;
   }) => {
     try {
       await db.addHabit({
@@ -445,6 +468,7 @@ export default function HabitsScreen() {
         category: habitData.category,
         frequency: "daily",
         time: habitData.time,
+        track_time: habitData.track_time,
       });
 
       // Reload data to show the new habit
@@ -474,15 +498,15 @@ export default function HabitsScreen() {
 
   const handleDeleteHabit = async (habitId: number) => {
     if (!editingHabit) return;
-    
+
     try {
       await db.deleteHabit(habitId);
       await loadData();
-      
+
       // Close the edit modal
       setIsEditHabitVisible(false);
       setEditingHabit(null);
-      
+
       Alert.alert("Success", "Habit deleted successfully");
     } catch (error) {
       console.error("Error deleting habit:", error);
@@ -496,6 +520,7 @@ export default function HabitsScreen() {
     emoji: string;
     category: string;
     time: string;
+    track_time: boolean;
   }) => {
     if (!editingHabit) return;
 
@@ -507,6 +532,7 @@ export default function HabitsScreen() {
         category: habitData.category,
         frequency: "daily",
         time: habitData.time,
+        track_time: habitData.track_time ?? editingHabit.track_time ?? false,
       });
 
       // Reload data to show the updated habit
@@ -816,6 +842,20 @@ const styles = StyleSheet.create({
     minHeight: 36,
     alignItems: "center",
     justifyContent: "center",
+  },
+  timerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.dark.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  timerButtonText: {
+    color: Colors.dark.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
   },
   miniCalendarSection: {
     marginBottom: 16,

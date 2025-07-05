@@ -28,6 +28,9 @@ interface HabitStatsData {
   longestStreak: number;
   totalCompleted: number;
   allLogs: HabitLog[];
+  totalTimeSpent: number; // in seconds
+  averageSessionTime: number; // in seconds
+  longestSession: number; // in seconds
 }
 
 export default function StatsScreen() {
@@ -97,12 +100,37 @@ export default function StatsScreen() {
         const longestStreak = calculateLongestStreak(allLogs);
         const totalCompleted = allLogs.filter((log) => log.completed).length;
 
+        // Calculate time-based metrics for time-tracking habits
+        let totalTimeSpent = 0;
+        let averageSessionTime = 0;
+        let longestSession = 0;
+
+        if (habit.track_time) {
+          const timeSpentLogs = allLogs.filter((log) => log.time_spent > 0);
+          totalTimeSpent = timeSpentLogs.reduce(
+            (sum, log) => sum + log.time_spent,
+            0
+          );
+
+          if (timeSpentLogs.length > 0) {
+            averageSessionTime = Math.floor(
+              totalTimeSpent / timeSpentLogs.length
+            );
+            longestSession = Math.max(
+              ...timeSpentLogs.map((log) => log.time_spent)
+            );
+          }
+        }
+
         return {
           habit,
           currentStreak,
           longestStreak,
           totalCompleted,
           allLogs,
+          totalTimeSpent,
+          averageSessionTime,
+          longestSession,
         };
       });
 
@@ -149,6 +177,18 @@ export default function StatsScreen() {
     if (level >= 10) return "Habit Pro 💪";
     if (level >= 5) return "Habit Builder 🔨";
     return "Habit Beginner 🌱";
+  };
+
+  const formatTime = (seconds: number): string => {
+    if (seconds === 0) return "0m";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
   };
 
   const xpProgress = getXPProgress();
@@ -290,6 +330,35 @@ export default function StatsScreen() {
                     <Text style={styles.statLabel}>Days Completed</Text>
                   </View>
                 </View>
+
+                {/* Time Tracking Stats for time-tracking habits */}
+                {habitData.habit.track_time && habitData.totalTimeSpent > 0 && (
+                  <View style={styles.timeStatsSection}>
+                    <Text style={styles.timeStatsTitle}>⏱️ Time Tracking</Text>
+                    <View style={styles.timeStatsRow}>
+                      <View style={styles.timeStatItem}>
+                        <Text style={styles.timeStatValue}>
+                          {formatTime(habitData.totalTimeSpent)}
+                        </Text>
+                        <Text style={styles.timeStatLabel}>Total Time</Text>
+                      </View>
+                      <View style={styles.timeStatItem}>
+                        <Text style={styles.timeStatValue}>
+                          {formatTime(habitData.averageSessionTime)}
+                        </Text>
+                        <Text style={styles.timeStatLabel}>Avg Session</Text>
+                      </View>
+                      <View style={styles.timeStatItem}>
+                        <Text style={styles.timeStatValue}>
+                          {formatTime(habitData.longestSession)}
+                        </Text>
+                        <Text style={styles.timeStatLabel}>
+                          Longest Session
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
               </GlassCard>
             ))
           )}
@@ -545,5 +614,35 @@ const styles = StyleSheet.create({
     color: Colors.dark.textMuted,
     fontStyle: "italic",
     marginTop: 8,
+  },
+  timeStatsSection: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: Colors.dark.background3,
+    borderRadius: 12,
+  },
+  timeStatsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.textPrimary,
+    marginBottom: 12,
+  },
+  timeStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  timeStatItem: {
+    alignItems: "center",
+  },
+  timeStatValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.primary,
+    marginBottom: 4,
+  },
+  timeStatLabel: {
+    fontSize: 12,
+    color: Colors.dark.textSecondary,
+    textAlign: "center",
   },
 });
