@@ -57,6 +57,8 @@ export interface HabitSession {
   start_time: string; // ISO timestamp
   end_time: string | null;
   duration: number; // seconds
+  intensity: number; // 1-5 scale
+  notes: string; // session notes
 }
 
 export interface UserStats {
@@ -153,9 +155,20 @@ export const useDatabase = () => {
           start_time TEXT NOT NULL,
           end_time TEXT,
           duration INTEGER DEFAULT 0,
+          intensity INTEGER DEFAULT 3,
+          notes TEXT DEFAULT '',
           FOREIGN KEY (habit_id) REFERENCES habits (id)
         );
       `);
+
+      // Add new columns to existing habit_sessions table if they don't exist
+      await db.execAsync(`
+        ALTER TABLE habit_sessions ADD COLUMN intensity INTEGER DEFAULT 3;
+      `).catch(() => {}); // Ignore error if column already exists
+      
+      await db.execAsync(`
+        ALTER TABLE habit_sessions ADD COLUMN notes TEXT DEFAULT '';
+      `).catch(() => {}); // Ignore error if column already exists
 
       // Create habit_logs table
       await db.execAsync(`
@@ -1409,7 +1422,7 @@ export const useDatabase = () => {
     }
   };
 
-  const stopHabitSession = async (sessionId: number): Promise<void> => {
+  const stopHabitSession = async (sessionId: number, intensity: number = 3, notes: string = ''): Promise<void> => {
     try {
       const session = await db.getFirstAsync(
         'SELECT * FROM habit_sessions WHERE id = ?',
@@ -1421,10 +1434,10 @@ export const useDatabase = () => {
       const endTime = new Date().toISOString();
       const duration = Math.floor((new Date(endTime).getTime() - new Date(session.start_time).getTime()) / 1000);
 
-      // Update session record
+      // Update session record with intensity and notes
       await db.runAsync(
-        'UPDATE habit_sessions SET end_time = ?, duration = ? WHERE id = ?',
-        [endTime, duration, sessionId]
+        'UPDATE habit_sessions SET end_time = ?, duration = ?, intensity = ?, notes = ? WHERE id = ?',
+        [endTime, duration, intensity, notes, sessionId]
       );
 
       const date = session.start_time.split('T')[0];

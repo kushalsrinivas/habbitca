@@ -153,7 +153,7 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
     const timer = setTimeout(() => {
       loadData(selectedPeriod);
     }, 100);
-
+    
     return () => clearTimeout(timer);
   }, [selectedPeriod]);
 
@@ -188,9 +188,9 @@ export const ActivityTrendChart: React.FC<ActivityTrendChartProps> = ({
   const chartData =
     data.length > 0
       ? data.map((point, index) => ({
-          x: index,
-          y: point.value,
-          label: point.label,
+    x: index,
+    y: point.value,
+    label: point.label,
         }))
       : [{ x: 0, y: 0, label: "No data" }];
 

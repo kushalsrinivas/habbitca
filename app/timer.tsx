@@ -10,18 +10,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/Colors";
 import { type Habit, useDatabase } from "@/hooks/useDatabase";
 import { useTimer } from "@/hooks/useTimer";
-import { useTimerNotifications } from "@/hooks/useTimerNotifications";
 
 export default function TimerScreen() {
   const params = useLocalSearchParams();
@@ -31,6 +25,7 @@ export default function TimerScreen() {
   const [intensity, setIntensity] = useState(3);
   const [isConfirming, setIsConfirming] = useState(false);
   const [finalDuration, setFinalDuration] = useState(0);
+  const [finalSessionId, setFinalSessionId] = useState<number | null>(null);
 
   const db = useDatabase();
   const {
@@ -42,15 +37,6 @@ export default function TimerScreen() {
     stopTimer,
     formatTime,
   } = useTimer();
-  const pulseScale = useSharedValue(1);
-
-  // Timer notifications
-  useTimerNotifications({
-    isRunning: timer.isRunning,
-    isPaused: timer.isPaused,
-    habitTitle: habit?.title || "Habit Timer",
-    elapsedTime: timer.elapsedTime,
-  });
 
   // Load habit data
   useEffect(() => {
@@ -76,24 +62,6 @@ export default function TimerScreen() {
     }
   }, [habitId, db]);
 
-  // Timer is now managed by the useTimer hook
-
-  // Pulse animation for running timer
-  useEffect(() => {
-    if (timer.isRunning && !timer.isPaused) {
-      pulseScale.value = withSpring(1.1, { damping: 2, stiffness: 100 });
-      const interval = setInterval(() => {
-        pulseScale.value = withSpring(1.1, { damping: 2, stiffness: 100 });
-        setTimeout(() => {
-          pulseScale.value = withSpring(1, { damping: 2, stiffness: 100 });
-        }, 500);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      pulseScale.value = withSpring(1, { damping: 2, stiffness: 100 });
-    }
-  }, [timer.isRunning, timer.isPaused, pulseScale]);
-
   const handleStart = async () => {
     try {
       const sessionId = await db.startHabitSession(habitId);
@@ -118,23 +86,24 @@ export default function TimerScreen() {
 
   const handleStop = () => {
     if (timer.isRunning) {
+      // Stop the timer immediately
       setFinalDuration(timer.elapsedTime);
+      setFinalSessionId(timer.sessionId);
+      stopTimer();
       setIsConfirming(true);
     }
   };
 
   const handleLog = async () => {
     try {
-      if (timer.sessionId) {
-        await db.stopHabitSession(timer.sessionId);
+      if (finalSessionId) {
+        await db.stopHabitSession(finalSessionId, intensity, notes);
       }
-
-      // Reset timer
-      stopTimer();
 
       setIsConfirming(false);
       setNotes("");
       setIntensity(3);
+      setFinalSessionId(null);
 
       Alert.alert(
         "Session Logged! 🎉",
@@ -155,18 +124,13 @@ export default function TimerScreen() {
   const handleCancel = () => {
     setIsConfirming(false);
     setFinalDuration(0);
+    setFinalSessionId(null);
   };
 
   const handleEditDuration = (newDuration: string) => {
     const duration = parseInt(newDuration) || 0;
     setFinalDuration(Math.max(0, duration));
   };
-
-  const timerAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: pulseScale.value }],
-    };
-  });
 
   const getTimerColor = () => {
     if (!timer.isRunning) return Colors.dark.textSecondary;
@@ -223,7 +187,7 @@ export default function TimerScreen() {
 
         {/* Timer Display */}
         <View style={styles.timerSection}>
-          <Animated.View style={[styles.timerContainer, timerAnimatedStyle]}>
+          <View style={styles.timerContainer}>
             <Text style={[styles.timerText, { color: getTimerColor() }]}>
               {formatTime(timer.elapsedTime)}
             </Text>
@@ -234,7 +198,7 @@ export default function TimerScreen() {
                 ? "Paused"
                 : "Running"}
             </Text>
-          </Animated.View>
+          </View>
         </View>
 
         {/* Timer Controls */}
@@ -257,7 +221,7 @@ export default function TimerScreen() {
                 style={styles.controlButton}
               />
               <ClayButton
-                title="Stop & Log"
+                title="Finish"
                 onPress={handleStop}
                 variant="primary"
                 size="medium"
@@ -266,63 +230,13 @@ export default function TimerScreen() {
             </View>
           )}
         </View>
-
-        {/* Notes Section */}
-        <GlassCard style={styles.notesCard}>
-          <Text style={styles.notesTitle}>Session Notes (Optional)</Text>
-          <TextInput
-            style={styles.notesInput}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="How did this session go? Any insights?"
-            placeholderTextColor={Colors.dark.textMuted}
-            multiline
-            numberOfLines={3}
-          />
-        </GlassCard>
-
-        {/* Intensity Selector */}
-        <GlassCard style={styles.intensityCard}>
-          <Text style={styles.intensityTitle}>Effort Level</Text>
-          <View style={styles.intensitySelector}>
-            {[1, 2, 3, 4, 5].map((level) => (
-              <Pressable
-                key={level}
-                style={[
-                  styles.intensityButton,
-                  {
-                    backgroundColor:
-                      intensity === level
-                        ? getIntensityColor(level)
-                        : Colors.dark.background3,
-                  },
-                ]}
-                onPress={() => setIntensity(level)}
-              >
-                <Text
-                  style={[
-                    styles.intensityText,
-                    {
-                      color:
-                        intensity === level
-                          ? Colors.dark.textPrimary
-                          : Colors.dark.textSecondary,
-                    },
-                  ]}
-                >
-                  {level}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </GlassCard>
       </View>
 
       {/* Confirmation Modal */}
       {isConfirming && (
         <View style={styles.modalOverlay}>
           <GlassCard style={styles.confirmationModal}>
-            <Text style={styles.confirmationTitle}>Log Session</Text>
+            <Text style={styles.confirmationTitle}>Session Complete! 🎉</Text>
             <Text style={styles.confirmationText}>
               You spent {formatTime(finalDuration)} on {habit.title}
             </Text>
@@ -339,6 +253,63 @@ export default function TimerScreen() {
                 }
                 keyboardType="numeric"
                 selectTextOnFocus
+              />
+            </View>
+
+            {/* Intensity Selector */}
+            <View style={styles.modalIntensitySection}>
+              <Text style={styles.modalIntensityTitle}>
+                How was your effort level?
+              </Text>
+              <View style={styles.modalIntensitySelector}>
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <Pressable
+                    key={level}
+                    style={[
+                      styles.modalIntensityButton,
+                      {
+                        backgroundColor:
+                          intensity === level
+                            ? getIntensityColor(level)
+                            : Colors.dark.background3,
+                      },
+                    ]}
+                    onPress={() => setIntensity(level)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalIntensityText,
+                        {
+                          color:
+                            intensity === level
+                              ? Colors.dark.textPrimary
+                              : Colors.dark.textSecondary,
+                        },
+                      ]}
+                    >
+                      {level}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.intensityHint}>
+                1 = Light effort • 5 = Maximum effort
+              </Text>
+            </View>
+
+            {/* Notes Section */}
+            <View style={styles.modalNotesSection}>
+              <Text style={styles.modalNotesTitle}>
+                Session Notes (Optional)
+              </Text>
+              <TextInput
+                style={styles.modalNotesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="How did this session go? Any insights?"
+                placeholderTextColor={Colors.dark.textMuted}
+                multiline
+                numberOfLines={3}
               />
             </View>
 
@@ -461,51 +432,7 @@ const styles = StyleSheet.create({
   controlButton: {
     flex: 1,
   },
-  notesCard: {
-    padding: 20,
-    marginBottom: 20,
-  },
-  notesTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.dark.textPrimary,
-    marginBottom: 12,
-  },
-  notesInput: {
-    backgroundColor: Colors.dark.background3,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: Colors.dark.textPrimary,
-    textAlignVertical: "top",
-    minHeight: 80,
-  },
-  intensityCard: {
-    padding: 20,
-  },
-  intensityTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.dark.textPrimary,
-    marginBottom: 16,
-  },
-  intensitySelector: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  intensityButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: Colors.dark.clay.border,
-  },
-  intensityText: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+
   modalOverlay: {
     position: "absolute",
     top: 0,
@@ -557,5 +484,59 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
+  },
+  modalIntensitySection: {
+    marginBottom: 20,
+  },
+  modalIntensityTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.textPrimary,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalIntensitySelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  modalIntensityButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: Colors.dark.clay.border,
+  },
+  modalIntensityText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  intensityHint: {
+    fontSize: 12,
+    color: Colors.dark.textMuted,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  modalNotesSection: {
+    marginBottom: 20,
+  },
+  modalNotesTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.dark.textPrimary,
+    marginBottom: 12,
+  },
+  modalNotesInput: {
+    backgroundColor: Colors.dark.background3,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    color: Colors.dark.textPrimary,
+    textAlignVertical: "top",
+    minHeight: 70,
+    borderWidth: 1,
+    borderColor: Colors.dark.clay.border,
   },
 });
