@@ -1166,8 +1166,8 @@ export const useDatabase = () => {
 
   const initializeSampleHabits = async () => {
     try {
-      // Check if habits already exist
-      const existingHabits = await getHabits();
+      // Check if habits already exist (including deleted ones to prevent duplication)
+      const existingHabits = await db.getAllAsync('SELECT * FROM habits');
       if (existingHabits.length > 0) return;
 
       // Add sample habits for testing
