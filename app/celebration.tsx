@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 80,
     paddingHorizontal: 24,
     alignItems: "center",
     zIndex: 3,

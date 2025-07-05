@@ -500,13 +500,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.dark.textPrimary,
   },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 10,
+
     paddingBottom: 20,
+    padding: 20,
+    paddingTop: 20,
+    marginTop: 30,
   },
   backButton: {
     padding: 8,

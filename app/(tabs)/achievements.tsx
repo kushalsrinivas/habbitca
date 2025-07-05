@@ -37,8 +37,6 @@ export default function AchievementsScreen() {
     setRefreshing(false);
   };
 
-
-
   useFocusEffect(
     useCallback(() => {
       loadAchievements();
@@ -187,8 +185,6 @@ export default function AchievementsScreen() {
           <Text style={styles.subtitle}>
             Your habit-building journey milestones
           </Text>
-
-          
         </View>
 
         {/* Stats Overview */}
@@ -346,8 +342,9 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    paddingTop: 20,
     paddingBottom: 10,
-    marginTop: 20,
+    marginTop: 30,
   },
   title: {
     fontSize: 32,
@@ -496,5 +493,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
-
 });
