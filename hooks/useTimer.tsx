@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useBackgroundTimer } from './useBackgroundTimer';
 
 export interface TimerState {
@@ -24,7 +24,43 @@ const initialTimerState: TimerState = {
   habitId: null,
 };
 
-export const useTimer = () => {
+// --------------------
+// Context Setup
+// --------------------
+
+type TimerContextType = {
+  timer: TimerState;
+  isLoaded: boolean;
+  startTimer: (habitId: number, sessionId: number) => void;
+  continueTimer: (
+    habitId: number,
+    sessionId: number,
+    existingElapsedSeconds: number
+  ) => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
+  stopTimer: () => Promise<void>;
+  resetTimer: () => Promise<void>;
+  clearPersistedState: () => Promise<void>;
+  getActiveSession: () =>
+    | {
+        sessionId: number;
+        habitId: number;
+        elapsedTime: number;
+        isRunning: boolean;
+        isPaused: boolean;
+      }
+    | null;
+  formatTime: (seconds: number) => string;
+};
+
+const TimerContext = createContext<TimerContextType | undefined>(undefined);
+
+// --------------------
+// Internal Hook (previous implementation)
+// --------------------
+
+const useTimerInternal = () => {
   const [timer, setTimer] = useState<TimerState>(initialTimerState);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -126,6 +162,20 @@ export const useTimer = () => {
     });
   }, []);
 
+  const continueTimer = useCallback((habitId: number, sessionId: number, existingElapsedSeconds: number) => {
+    const now = Date.now();
+    console.log('🔄 Continuing timer with existing elapsed time:', existingElapsedSeconds);
+    setTimer({
+      isRunning: true,
+      isPaused: false,
+      startTime: now,
+      pausedTime: existingElapsedSeconds * 1000, // Convert to milliseconds
+      elapsedTime: existingElapsedSeconds,
+      sessionId,
+      habitId,
+    });
+  }, []);
+
   const pauseTimer = useCallback(() => {
     setTimer((prev) => {
       if (prev.isRunning && !prev.isPaused && prev.startTime) {
@@ -152,11 +202,27 @@ export const useTimer = () => {
     });
   }, []);
 
-  const stopTimer = useCallback(() => {
+  const stopTimer = useCallback(async () => {
+    // Clear persisted state from AsyncStorage
+    try {
+      await AsyncStorage.removeItem(TIMER_STORAGE_KEY);
+    } catch (error) {
+      console.error('Error clearing timer state:', error);
+    }
+    
+    // Reset timer state
     setTimer(initialTimerState);
   }, []);
 
-  const resetTimer = useCallback(() => {
+  const resetTimer = useCallback(async () => {
+    // Clear persisted state from AsyncStorage
+    try {
+      await AsyncStorage.removeItem(TIMER_STORAGE_KEY);
+    } catch (error) {
+      console.error('Error clearing timer state:', error);
+    }
+    
+    // Reset timer state
     setTimer(initialTimerState);
   }, []);
 
@@ -195,6 +261,7 @@ export const useTimer = () => {
     timer,
     isLoaded,
     startTimer,
+    continueTimer,
     pauseTimer,
     resumeTimer,
     stopTimer,
@@ -203,4 +270,30 @@ export const useTimer = () => {
     getActiveSession,
     formatTime,
   };
+};
+
+// --------------------
+// Timer Provider
+// --------------------
+
+export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const timerContext = useTimerInternal();
+
+  return (
+    <TimerContext.Provider value={timerContext}>
+      {children}
+    </TimerContext.Provider>
+  );
+};
+
+// --------------------
+// Custom Hook (for components)
+// --------------------
+
+export const useTimer = () => {
+  const context = useContext(TimerContext);
+  if (context === undefined) {
+    throw new Error('useTimer must be used within a TimerProvider');
+  }
+  return context;
 }; 

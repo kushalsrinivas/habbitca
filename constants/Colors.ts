@@ -30,6 +30,7 @@ export const Colors = {
     warning: '#F59E0B', // Amber
     error: '#EF4444', // Red
     success: '#22C55E', // Green
+    info: '#3B82F6', // Blue
     
     // Background layers
     background1: '#0F0F0F', // Deepest background

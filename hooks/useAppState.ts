@@ -6,9 +6,16 @@ export const useAppState = () => {
   const [isBackground, setIsBackground] = useState(false);
 
   useEffect(() => {
+    console.log('📱 Initial app state:', AppState.currentState);
+    
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      console.log('📱 App state changed:', { from: appState, to: nextAppState });
+      
       setAppState(nextAppState);
-      setIsBackground(nextAppState === 'background' || nextAppState === 'inactive');
+      const newIsBackground = nextAppState === 'background' || nextAppState === 'inactive';
+      setIsBackground(newIsBackground);
+      
+      console.log('📱 Background state:', newIsBackground);
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -16,7 +23,7 @@ export const useAppState = () => {
     return () => {
       subscription?.remove();
     };
-  }, []);
+  }, [appState]);
 
   return {
     appState,

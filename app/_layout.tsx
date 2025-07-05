@@ -10,6 +10,8 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { useDatabase } from "@/hooks/useDatabase";
+import { useGlobalTimerNotifications } from "@/hooks/useGlobalTimerNotifications";
+import { TimerProvider } from "@/hooks/useTimer";
 import { useEffect } from "react";
 
 // Database initialization component
@@ -29,6 +31,12 @@ function DatabaseInitializer({ children }: { children: React.ReactNode }) {
     initializeDb();
   }, [db]);
 
+  return <>{children}</>;
+}
+
+// Global timer notifications component
+function GlobalTimerNotifications({ children }: { children: React.ReactNode }) {
+  useGlobalTimerNotifications();
   return <>{children}</>;
 }
 
@@ -60,31 +68,38 @@ export default function RootLayout() {
           end={{ x: 1, y: 1 }}
         />
         <SQLiteProvider databaseName="habittracker.db">
-          <DatabaseInitializer>
-            <ThemeProvider value={DarkTheme}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="celebration"
-                  options={{
-                    headerShown: false,
-                    presentation: "fullScreenModal",
-                    animation: "slide_from_bottom",
-                  }}
-                />
-                <Stack.Screen
-                  name="timer"
-                  options={{
-                    headerShown: false,
-                    presentation: "card",
-                    animation: "slide_from_right",
-                  }}
-                />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="light" />
-            </ThemeProvider>
-          </DatabaseInitializer>
+          <TimerProvider>
+            <DatabaseInitializer>
+              <GlobalTimerNotifications>
+                <ThemeProvider value={DarkTheme}>
+                  <Stack>
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                      name="celebration"
+                      options={{
+                        headerShown: false,
+                        presentation: "fullScreenModal",
+                        animation: "slide_from_bottom",
+                      }}
+                    />
+                    <Stack.Screen
+                      name="timer"
+                      options={{
+                        headerShown: false,
+                        presentation: "card",
+                        animation: "slide_from_right",
+                      }}
+                    />
+                    <Stack.Screen name="+not-found" />
+                  </Stack>
+                  <StatusBar style="light" />
+                </ThemeProvider>
+              </GlobalTimerNotifications>
+            </DatabaseInitializer>
+          </TimerProvider>
         </SQLiteProvider>
       </View>
     </GestureHandlerRootView>

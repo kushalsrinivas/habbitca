@@ -14,7 +14,11 @@ import {
 import { ClayButton } from "@/components/ui/ClayButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Colors } from "@/constants/Colors";
-import { type Habit, useDatabase } from "@/hooks/useDatabase";
+import {
+  type Habit,
+  type HabitSession,
+  useDatabase,
+} from "@/hooks/useDatabase";
 import { useTimer } from "@/hooks/useTimer";
 
 export default function TimerScreen() {
@@ -26,22 +30,29 @@ export default function TimerScreen() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [finalDuration, setFinalDuration] = useState(0);
   const [finalSessionId, setFinalSessionId] = useState<number | null>(null);
+  const [existingActiveSession, setExistingActiveSession] =
+    useState<HabitSession | null>(null);
+  const [allActiveSessions, setAllActiveSessions] = useState<HabitSession[]>(
+    []
+  );
 
   const db = useDatabase();
   const {
     timer,
     isLoaded,
     startTimer,
+    continueTimer,
     pauseTimer,
     resumeTimer,
     stopTimer,
     formatTime,
   } = useTimer();
 
-  // Load habit data
+  // Load habit data and check for existing sessions
   useEffect(() => {
-    const loadHabit = async () => {
+    const loadData = async () => {
       try {
+        // Load habit details
         const habits = await db.getHabits();
         const targetHabit = habits.find((h) => h.id === habitId);
         if (targetHabit) {
@@ -49,23 +60,77 @@ export default function TimerScreen() {
         } else {
           Alert.alert("Error", "Habit not found");
           router.back();
+          return;
         }
+
+        // Check for existing active session for this habit
+        const activeSession = await db.getActiveSession(habitId);
+        setExistingActiveSession(activeSession);
+
+        // Check for any other active sessions
+        const allActive = await db.getAllActiveSessions();
+        setAllActiveSessions(allActive);
+
+        console.log("🔍 Session check:", {
+          habitId,
+          activeSession,
+          allActive,
+          timerRunning: timer.isRunning,
+          timerHabitId: timer.habitId,
+        });
       } catch (error) {
-        console.error("Error loading habit:", error);
-        Alert.alert("Error", "Failed to load habit");
+        console.error("Error loading data:", error);
+        Alert.alert("Error", "Failed to load data");
         router.back();
       }
     };
 
     if (habitId) {
-      loadHabit();
+      loadData();
     }
-  }, [habitId, db]);
+  }, [habitId, db, timer.isRunning]);
 
   const handleStart = async () => {
     try {
+      // Check if there's already an active session for ANY habit
+      const allActive = await db.getAllActiveSessions();
+
+      if (allActive.length > 0) {
+        const activeHabit = allActive[0];
+        const habits = await db.getHabits();
+        const habitName =
+          habits.find((h) => h.id === activeHabit.habit_id)?.title ||
+          "Unknown Habit";
+
+        Alert.alert(
+          "Active Session Found",
+          `You already have an active session for "${habitName}". Please finish that session before starting a new one.`,
+          [
+            {
+              text: "Go to Active Session",
+              onPress: () => {
+                router.push({
+                  pathname: "/timer",
+                  params: { habitId: activeHabit.habit_id.toString() },
+                });
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+          ]
+        );
+        return;
+      }
+
+      // Start new session
       const sessionId = await db.startHabitSession(habitId);
       startTimer(habitId, sessionId);
+
+      // Refresh session data
+      const activeSession = await db.getActiveSession(habitId);
+      setExistingActiveSession(activeSession);
     } catch (error) {
       console.error("Error starting timer:", error);
       Alert.alert("Error", "Failed to start timer");
@@ -84,12 +149,12 @@ export default function TimerScreen() {
     }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (timer.isRunning) {
       // Stop the timer immediately
       setFinalDuration(timer.elapsedTime);
       setFinalSessionId(timer.sessionId);
-      stopTimer();
+      await stopTimer();
       setIsConfirming(true);
     }
   };
@@ -104,6 +169,11 @@ export default function TimerScreen() {
       setNotes("");
       setIntensity(3);
       setFinalSessionId(null);
+      setFinalDuration(0);
+
+      // Clear existing session data
+      setExistingActiveSession(null);
+      setAllActiveSessions([]);
 
       Alert.alert(
         "Session Logged! 🎉",
@@ -121,15 +191,58 @@ export default function TimerScreen() {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // If we have a session ID, we need to cancel the session in the database
+    if (finalSessionId) {
+      try {
+        // Delete the incomplete session from the database
+        await db.deleteHabitSession(finalSessionId);
+      } catch (error) {
+        console.error("Error canceling session:", error);
+      }
+    }
+
+    // Reset all state
     setIsConfirming(false);
     setFinalDuration(0);
     setFinalSessionId(null);
+    setNotes("");
+    setIntensity(3);
+
+    // Clear existing session data
+    setExistingActiveSession(null);
+    setAllActiveSessions([]);
+
+    // Ensure timer is fully reset
+    await stopTimer();
   };
 
   const handleEditDuration = (newDuration: string) => {
     const duration = parseInt(newDuration) || 0;
     setFinalDuration(Math.max(0, duration));
+  };
+
+  const handleContinueExistingSession = async () => {
+    if (existingActiveSession) {
+      try {
+        // Calculate elapsed time from database session
+        const startTime = new Date(existingActiveSession.start_time).getTime();
+        const currentTime = Date.now();
+        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+
+        console.log("🔄 Continuing session:", {
+          sessionId: existingActiveSession.id,
+          startTime: existingActiveSession.start_time,
+          elapsedSeconds,
+        });
+
+        // Continue timer with existing session data and correct elapsed time
+        continueTimer(habitId, existingActiveSession.id, elapsedSeconds);
+      } catch (error) {
+        console.error("Error continuing session:", error);
+        Alert.alert("Error", "Failed to continue session");
+      }
+    }
   };
 
   const getTimerColor = () => {
@@ -148,6 +261,11 @@ export default function TimerScreen() {
     ];
     return colors[level - 1] || Colors.dark.textMuted;
   };
+
+  const hasActiveSession = timer.isRunning || existingActiveSession;
+  const hasOtherActiveSessions =
+    allActiveSessions.length > 0 &&
+    !allActiveSessions.some((s) => s.habit_id === habitId);
 
   if (!habit) {
     return (
@@ -185,6 +303,37 @@ export default function TimerScreen() {
           </View>
         </GlassCard>
 
+        {/* Session Status Warning */}
+        {hasOtherActiveSessions && (
+          <GlassCard style={styles.warningCard}>
+            <Text style={styles.warningTitle}>⚠️ Active Session Detected</Text>
+            <Text style={styles.warningText}>
+              You have an active session for another habit. Please finish that
+              session before starting a new one.
+            </Text>
+          </GlassCard>
+        )}
+
+        {/* Existing Session Info */}
+        {existingActiveSession && !timer.isRunning && (
+          <GlassCard style={styles.existingSessionCard}>
+            <Text style={styles.existingSessionTitle}>
+              📱 Session in Progress
+            </Text>
+            <Text style={styles.existingSessionText}>
+              You have an unfinished session for this habit. Would you like to
+              continue it?
+            </Text>
+            <ClayButton
+              title="Continue Session"
+              onPress={handleContinueExistingSession}
+              variant="primary"
+              size="medium"
+              style={styles.continueButton}
+            />
+          </GlassCard>
+        )}
+
         {/* Timer Display */}
         <View style={styles.timerSection}>
           <View style={styles.timerContainer}>
@@ -203,13 +352,14 @@ export default function TimerScreen() {
 
         {/* Timer Controls */}
         <View style={styles.controlsSection}>
-          {!timer.isRunning ? (
+          {!hasActiveSession ? (
             <ClayButton
               title="Start Session"
               onPress={handleStart}
               variant="primary"
               size="large"
               style={styles.startButton}
+              disabled={hasOtherActiveSessions}
             />
           ) : (
             <View style={styles.activeControls}>
@@ -431,6 +581,47 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     flex: 1,
+  },
+  warningCard: {
+    padding: 20,
+    marginBottom: 20,
+    backgroundColor: Colors.dark.background2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.warning,
+  },
+  warningTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.warning,
+    marginBottom: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    lineHeight: 20,
+  },
+  existingSessionCard: {
+    padding: 20,
+    marginBottom: 20,
+    backgroundColor: Colors.dark.background2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.dark.info,
+  },
+  existingSessionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.dark.info,
+    marginBottom: 8,
+  },
+  existingSessionText: {
+    fontSize: 14,
+    color: Colors.dark.textSecondary,
+    marginBottom: 16,
+  },
+  continueButton: {
+    alignSelf: "center",
   },
 
   modalOverlay: {

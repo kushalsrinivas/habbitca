@@ -1517,6 +1517,16 @@ export const useDatabase = () => {
     }
   };
 
+  const deleteHabitSession = async (sessionId: number): Promise<void> => {
+    try {
+      await db.runAsync('DELETE FROM habit_sessions WHERE id = ?', [sessionId]);
+      dbEventEmitter.emit('habitDataChanged');
+    } catch (error) {
+      console.error('Error deleting habit session:', error);
+      throw error;
+    }
+  };
+
   return {
     initializeDatabase,
     addHabit,
@@ -1553,6 +1563,7 @@ export const useDatabase = () => {
     getAllActiveSessions,
     pauseHabitSession,
     getHabitSessions,
+    deleteHabitSession,
     // Event system for real-time updates
     onDataChange: (callback: () => void) => dbEventEmitter.on('habitDataChanged', callback),
     offDataChange: (callback: () => void) => dbEventEmitter.off('habitDataChanged', callback),
