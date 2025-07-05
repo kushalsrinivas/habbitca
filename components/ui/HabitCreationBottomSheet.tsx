@@ -3,6 +3,8 @@ import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -133,7 +135,7 @@ const CATEGORIES: Category[] = [
         id: "11",
         name: "Early Bedtime",
         description: "Get to bed early for better rest",
-        emoji: "��️",
+        emoji: "🛌",
         defaultTime: "22:00",
       },
       {
@@ -566,6 +568,8 @@ export const HabitCreationBottomSheet: React.FC<
   const [customHabitEmoji, setCustomHabitEmoji] = useState("⭐");
   const [customHabitTime, setCustomHabitTime] = useState("09:00");
 
+  const scrollViewRef = useRef<any>(null);
+
   // Time validation and formatting
   const formatTime = (input: string): string => {
     // Remove all non-digit characters
@@ -649,13 +653,17 @@ export const HabitCreationBottomSheet: React.FC<
     setCustomHabitTime(validated);
   };
 
-  // Snap points for the bottom sheet
+  // Snap points for the bottom sheet - dynamic based on keyboard state
   const snapPoints = useMemo(() => {
     if (!selectedCategory) {
       return ["30%"]; // Category selection
     }
+    if (isCustomMode) {
+      // When custom form is open, always use maximum available height
+      return ["98%"];
+    }
     return ["95%"]; // Template selection and form
-  }, [selectedCategory]);
+  }, [selectedCategory, isCustomMode]);
 
   // Handle sheet changes
   const handleSheetChanges = useCallback(
@@ -742,10 +750,19 @@ export const HabitCreationBottomSheet: React.FC<
         enablePanDownToClose
         backgroundStyle={styles.bottomSheetBackground}
         handleIndicatorStyle={styles.handleIndicator}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
       >
         <BottomSheetScrollView
+          ref={scrollViewRef}
           style={styles.content}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingBottom: isCustomMode ? 100 : 50,
+          }}
         >
           {!selectedCategory ? (
             // Step 1: Category Selection
@@ -827,70 +844,82 @@ export const HabitCreationBottomSheet: React.FC<
 
               {/* Custom Habit Form */}
               {isCustomMode && (
-                <View style={styles.customForm}>
-                  <Text style={styles.formTitle}>Custom Habit Details</Text>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === "ios" ? "padding" : "height"}
+                  keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+                >
+                  <View style={styles.customForm}>
+                    <Text style={styles.formTitle}>Custom Habit Details</Text>
 
-                  <View style={styles.formField}>
-                    <Text style={styles.fieldLabel}>Habit Name *</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={customHabitName}
-                      onChangeText={setCustomHabitName}
-                      placeholder="Enter habit name"
-                      placeholderTextColor={Colors.dark.textMuted}
-                    />
-                  </View>
-
-                  <View style={styles.formField}>
-                    <Text style={styles.fieldLabel}>
-                      Description (Optional)
-                    </Text>
-                    <TextInput
-                      style={[styles.textInput, styles.textArea]}
-                      value={customHabitDescription}
-                      onChangeText={setCustomHabitDescription}
-                      placeholder="Describe your habit"
-                      placeholderTextColor={Colors.dark.textMuted}
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </View>
-
-                  <View style={styles.formRow}>
-                    <View style={[styles.formField, { flex: 1 }]}>
-                      <Text style={styles.fieldLabel}>Emoji</Text>
+                    <View style={styles.formField}>
+                      <Text style={styles.fieldLabel}>Habit Name *</Text>
                       <TextInput
-                        style={styles.emojiInput}
-                        value={customHabitEmoji}
-                        onChangeText={setCustomHabitEmoji}
-                        maxLength={2}
-                      />
-                    </View>
-
-                    <View style={[styles.formField, { flex: 2 }]}>
-                      <Text style={styles.fieldLabel}>Time</Text>
-                      <TextInput
-                        style={styles.timeInput}
-                        value={customHabitTime}
-                        onChangeText={handleTimeChange}
-                        onBlur={handleTimeBlur}
-                        placeholder="09:00"
+                        style={styles.textInput}
+                        value={customHabitName}
+                        onChangeText={setCustomHabitName}
+                        placeholder="Enter habit name"
                         placeholderTextColor={Colors.dark.textMuted}
-                        keyboardType="numeric"
-                        maxLength={5}
-                        autoCorrect={false}
-                        autoCapitalize="none"
                       />
-                      <Text style={styles.timeHint}>
-                        Format: HH:MM (24h) or use AM/PM
+                    </View>
+
+                    <View style={styles.formField}>
+                      <Text style={styles.fieldLabel}>
+                        Description (Optional)
                       </Text>
+                      <TextInput
+                        style={[styles.textInput, styles.textArea]}
+                        value={customHabitDescription}
+                        onChangeText={setCustomHabitDescription}
+                        placeholder="Describe your habit"
+                        placeholderTextColor={Colors.dark.textMuted}
+                        multiline
+                        numberOfLines={3}
+                      />
+                    </View>
+
+                    <View style={styles.formRow}>
+                      <View style={[styles.formField, { flex: 1 }]}>
+                        <Text style={styles.fieldLabel}>Emoji</Text>
+                        <TextInput
+                          style={styles.emojiInput}
+                          value={customHabitEmoji}
+                          onChangeText={setCustomHabitEmoji}
+                          maxLength={2}
+                        />
+                      </View>
+
+                      <View style={[styles.formField, { flex: 2 }]}>
+                        <Text style={styles.fieldLabel}>Time</Text>
+                        <TextInput
+                          style={styles.timeInput}
+                          value={customHabitTime}
+                          onChangeText={handleTimeChange}
+                          onBlur={handleTimeBlur}
+                          placeholder="09:00"
+                          placeholderTextColor={Colors.dark.textMuted}
+                          keyboardType="numeric"
+                          maxLength={5}
+                          autoCorrect={false}
+                          autoCapitalize="none"
+                        />
+                        <Text style={styles.timeHint}>
+                          Format: HH:MM (24h) or use AM/PM
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
+                </KeyboardAvoidingView>
               )}
 
               {/* Action Buttons */}
-              <View style={styles.actionButtons}>
+              <View
+                style={[
+                  styles.actionButtons,
+                  {
+                    marginTop: isCustomMode ? 32 : 24,
+                  },
+                ]}
+              >
                 <AnimatedPressable
                   style={[styles.actionButton, styles.backButton]}
                   onPress={() => setSelectedCategory(null)}
@@ -1034,6 +1063,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginTop: 16,
+    marginBottom: 20,
   },
   formTitle: {
     fontSize: 18,
@@ -1042,7 +1072,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   formField: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   formRow: {
     flexDirection: "row",
@@ -1096,7 +1126,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginTop: 24,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   actionButton: {
     flex: 1,

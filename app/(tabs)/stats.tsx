@@ -234,59 +234,6 @@ export default function StatsScreen() {
           <ActivityTrendChart />
         </View>
 
-        {/* Achievements */}
-        <GlassCard style={styles.achievementsCard}>
-          <Text style={styles.cardTitle}>Achievements</Text>
-
-          <View style={styles.achievementsList}>
-            <View style={styles.achievement}>
-              <Text style={styles.achievementIcon}>🎯</Text>
-              <View style={styles.achievementInfo}>
-                <Text style={styles.achievementTitle}>First Habit</Text>
-                <Text style={styles.achievementDesc}>
-                  {totalHabits > 0 ? "Completed ✓" : "Create your first habit"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.achievement}>
-              <Text style={styles.achievementIcon}>🔥</Text>
-              <View style={styles.achievementInfo}>
-                <Text style={styles.achievementTitle}>Week Warrior</Text>
-                <Text style={styles.achievementDesc}>
-                  {(userStats?.longest_streak || 0) >= 7
-                    ? "Completed ✓"
-                    : "Maintain a 7-day streak"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.achievement}>
-              <Text style={styles.achievementIcon}>⚡</Text>
-              <View style={styles.achievementInfo}>
-                <Text style={styles.achievementTitle}>Level Up</Text>
-                <Text style={styles.achievementDesc}>
-                  {(userStats?.level || 1) >= 5
-                    ? "Completed ✓"
-                    : "Reach level 5"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.achievement}>
-              <Text style={styles.achievementIcon}>👑</Text>
-              <View style={styles.achievementInfo}>
-                <Text style={styles.achievementTitle}>Habit Master</Text>
-                <Text style={styles.achievementDesc}>
-                  {(userStats?.level || 1) >= 20
-                    ? "Completed ✓"
-                    : "Reach level 20"}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </GlassCard>
-
         {/* Habit Heatmaps */}
         <View style={styles.habitsSection}>
           <Text style={styles.sectionTitle}>Habit Consistency</Text>
